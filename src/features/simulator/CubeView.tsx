@@ -9,8 +9,15 @@ import {
   rotation,
 } from '../../domain/cube/cube';
 import type { Cube, Face, Move, Vec3 } from '../../domain/cube/cube';
+import { COLOR_LETTERS, CORNER_IDS } from '../../domain/f2l/lessons';
 
-type Props = { cube: Cube; reverse?: boolean; move?: Move; progress: number };
+type Props = {
+  cube: Cube;
+  reverse?: boolean;
+  move?: Move;
+  progress: number;
+  highlightIds?: readonly string[];
+};
 const dot = (a: Vec3, b: Vec3) =>
   a.reduce((sum, value, index) => sum + value * b[index], 0);
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -23,7 +30,13 @@ const right: Vec3 = [0.91, 0, -0.415];
 const up: Vec3 = [-0.2075, 0.866, -0.455];
 const camera: Vec3 = [0.3594, 0.5, 0.7881];
 
-export function CubeView({ cube, reverse = false, move, progress }: Props) {
+export function CubeView({
+  cube,
+  reverse = false,
+  move,
+  progress,
+  highlightIds,
+}: Props) {
   const viewUp = scale(up, reverse ? -1 : 1);
   const viewCamera = scale(camera, reverse ? -1 : 1);
   const project = (point: Vec3) => [
@@ -42,6 +55,9 @@ export function CubeView({ cube, reverse = false, move, progress }: Props) {
     sticker: string;
     fill: string;
     depth: number;
+    label: string;
+    labelPosition: number[];
+    light: boolean;
   }[] = [];
 
   for (let x = -1; x <= 1; x++)
@@ -75,12 +91,31 @@ export function CubeView({ cube, reverse = false, move, progress }: Props) {
           const sticker = cube.find(
             (s) => equal(s.position, position) && equal(s.normal, normal),
           );
+          const highlighted = sticker && highlightIds?.includes(sticker.id);
+          const crossPosition =
+            position[1] === -1 &&
+            Math.abs(position[0]) + Math.abs(position[2]) <= 1;
+          const muted =
+            highlightIds &&
+            sticker &&
+            !highlighted &&
+            !crossPosition &&
+            !equal(position, normal);
           polygons.push({
             key: `${x}:${y}:${z}:${face}`,
             points: corners(0.482),
             sticker: sticker ? corners(0.439) : '',
-            fill: sticker ? COLORS[sticker.color] : '#25352f',
+            fill: sticker
+              ? muted
+                ? '#cbd4ca'
+                : COLORS[sticker.color]
+              : '#25352f',
             depth: dot(transform(middle, position), viewCamera),
+            label: highlighted
+              ? `${CORNER_IDS.includes(sticker.id) ? 'C' : 'E'}·${COLOR_LETTERS[sticker.color]}`
+              : '',
+            labelPosition: project(transform(middle, position)),
+            light: sticker?.color === 'white' || sticker?.color === 'yellow',
           });
         }
       }
@@ -122,6 +157,23 @@ export function CubeView({ cube, reverse = false, move, progress }: Props) {
               strokeWidth="1.4"
               strokeLinejoin="round"
             />
+          )}
+          {polygon.label && (
+            <text
+              x={polygon.labelPosition[0]}
+              y={polygon.labelPosition[1]}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="15"
+              fontWeight="800"
+              fill={polygon.light ? '#23392b' : '#fff'}
+              stroke={polygon.light ? '#fff' : '#23392b'}
+              strokeWidth="0.5"
+              paintOrder="stroke"
+              data-target-label={polygon.label}
+            >
+              {polygon.label}
+            </text>
           )}
         </g>
       ))}

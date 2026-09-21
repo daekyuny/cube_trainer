@@ -12,6 +12,8 @@ import {
 import type { Face, Preset } from '../domain/cube/cube';
 import { CubeView } from '../features/simulator/CubeView';
 import { createSession, sessionReducer } from '../features/simulator/session';
+import { LessonPanel } from '../features/f2l/LessonPanel';
+import { TARGET_IDS, trainingStatus } from '../domain/f2l/lessons';
 
 const presets: { id: Preset; title: string; subtitle: string }[] = [
   { id: 'solved', title: '맞춘 큐브', subtitle: '여섯 면이 모두 완성된 상태' },
@@ -46,6 +48,7 @@ export function App() {
   );
   const [counterclockwise, setCounterclockwise] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [focus, setFocus] = useState(true);
   const command = session.queue[0];
 
   useEffect(() => {
@@ -113,6 +116,13 @@ export function App() {
         ? '흰색 십자가 완성'
         : '자유롭게 연습 중';
   const activePreset = presets.find((preset) => preset.id === session.preset)!;
+  const pairStatus = session.lesson ? trainingStatus(session.cube) : null;
+  const stageStatus =
+    pairStatus === 'inserted'
+      ? 'R·G 슬롯 완성 · W 십자 유지'
+      : pairStatus === 'paired'
+        ? '페어 완성 · W 십자 유지'
+        : cubeStatus;
   const facesLegend = (faces: Face[]) =>
     faces.map((face) => (
       <span key={face}>
@@ -134,7 +144,7 @@ export function App() {
           Cube Trainer
         </a>
         <span className="header-tag">
-          3 × 3 <span> / </span> 자유 연습
+          3 × 3 <span> / </span> {session.lesson ? 'F2L 페어링' : '자유 연습'}
         </span>
       </header>
       <main id="main">
@@ -147,11 +157,31 @@ export function App() {
             <i /> 노랑 위 · 흰색 아래
           </span>
         </div>
-        <div className="workspace">
+        <nav className="practice-modes" aria-label="연습 모드">
+          <button
+            aria-pressed={!session.lesson}
+            onClick={() => {
+              if (session.lesson)
+                dispatch({ type: 'preset', preset: 'solved' });
+            }}
+          >
+            자유 연습
+          </button>
+          <button
+            aria-pressed={Boolean(session.lesson)}
+            onClick={() => {
+              if (!session.lesson) dispatch({ type: 'lesson', id: 1 });
+            }}
+          >
+            F2L 페어링
+          </button>
+          <span>W 십자가 다음, 두 조각을 한 페어로</span>
+        </nav>
+        <div className={`workspace${session.lesson ? ' is-training' : ''}`}>
           <section className="simulator" aria-label="큐브 연습 공간">
             <div className="stage-toolbar">
               <span className="live-badge">
-                <i /> {cubeStatus}
+                <i /> {stageStatus}
               </span>
               <span className="move-count">
                 {session.history.filter((move) => move.face !== 'Y').length}{' '}
@@ -172,6 +202,9 @@ export function App() {
                   cube={session.cube}
                   move={command?.move}
                   progress={session.progress}
+                  highlightIds={
+                    session.lesson && focus ? TARGET_IDS : undefined
+                  }
                 />
                 <div className="face-legend">
                   {facesLegend(['F', 'R', 'U'])}
@@ -187,6 +220,9 @@ export function App() {
                   reverse
                   move={command?.move}
                   progress={session.progress}
+                  highlightIds={
+                    session.lesson && focus ? TARGET_IDS : undefined
+                  }
                 />
                 <div className="face-legend">
                   {facesLegend(['B', 'L', 'D'])}
@@ -194,7 +230,9 @@ export function App() {
               </figure>
             </div>
             <div className="stage-caption">
-              같은 큐브의 여섯 면을 함께 보고 있어요.
+              {session.lesson
+                ? 'C: W·R·G 코너 · E: R·G 엣지 / 두 그림은 같은 큐브입니다.'
+                : '같은 큐브의 여섯 면을 함께 보고 있어요.'}
             </div>
             <div className="yaw-controls">
               <button
@@ -225,13 +263,23 @@ export function App() {
             <div className="history-panel">
               <div className="history-heading">
                 <h2>돌린 수순</h2>
-                <button
-                  className="text-button"
-                  disabled={Boolean(command) || !session.history.length}
-                  onClick={() => dispatch({ type: 'undo' })}
-                >
-                  ↶ 한 수 되돌리기
-                </button>
+                <div className="history-actions">
+                  <button
+                    className="text-button"
+                    disabled={!session.history.length && !command}
+                    onClick={() => dispatch({ type: 'clear-history' })}
+                    title="큐브는 유지하고 이력과 대기 입력만 비웁니다"
+                  >
+                    수순 리셋
+                  </button>
+                  <button
+                    className="text-button"
+                    disabled={Boolean(command) || !session.history.length}
+                    onClick={() => dispatch({ type: 'undo' })}
+                  >
+                    ↶ 한 수 되돌리기
+                  </button>
+                </div>
               </div>
               <div className="move-history" aria-label="회전 이력">
                 {session.history.length ? (
@@ -258,6 +306,14 @@ export function App() {
             </div>
           </section>
           <aside className="control-panel" aria-label="연습 컨트롤">
+            {session.lesson && (
+              <LessonPanel
+                session={session}
+                dispatch={dispatch}
+                focus={focus}
+                onFocusChange={setFocus}
+              />
+            )}
             <section className="turn-panel">
               <div className="panel-heading">
                 <h2>면 돌리기</h2>
@@ -327,46 +383,76 @@ export function App() {
                     : '\u00a0')}
               </p>
             </section>
-            <section className="preset-panel">
-              <div className="panel-heading">
-                <h2>어디서 시작할까요?</h2>
-                <span>PRESETS</span>
-              </div>
-              <div className="preset-list">
-                {presets.map((preset, index) => (
-                  <button
-                    key={preset.id}
-                    className={`preset-button ${session.preset === preset.id ? 'selected' : ''}`}
-                    onClick={() =>
-                      dispatch({ type: 'preset', preset: preset.id })
-                    }
-                    aria-label={`${preset.title} 프리셋 적용`}
-                  >
-                    <span className="preset-index">0{index + 1}</span>
-                    <span>
-                      <strong>{preset.title}</strong>
-                      <small>{preset.subtitle}</small>
-                    </span>
-                    <span className="preset-arrow" aria-hidden="true">
-                      ↗
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p className="preset-note">
-                누르면 해당 상태로 새로 시작하고 수순을 비웁니다.
-              </p>
-            </section>
+            {!session.lesson && (
+              <section className="preset-panel">
+                <div className="panel-heading">
+                  <h2>어디서 시작할까요?</h2>
+                  <span>PRESETS</span>
+                </div>
+                <div className="preset-list">
+                  {presets.map((preset, index) => (
+                    <button
+                      key={preset.id}
+                      className={`preset-button ${session.preset === preset.id ? 'selected' : ''}`}
+                      onClick={() =>
+                        dispatch({ type: 'preset', preset: preset.id })
+                      }
+                      aria-label={`${preset.title} 프리셋 적용`}
+                    >
+                      <span className="preset-index">0{index + 1}</span>
+                      <span>
+                        <strong>{preset.title}</strong>
+                        <small>{preset.subtitle}</small>
+                      </span>
+                      <span className="preset-arrow" aria-hidden="true">
+                        ↗
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="preset-note">
+                  누르면 해당 상태로 새로 시작하고 수순을 비웁니다.
+                </p>
+                <button
+                  className="secondary-button"
+                  onClick={() => dispatch({ type: 'restart' })}
+                >
+                  현재 시작 상태로 되돌리기
+                </button>
+              </section>
+            )}
           </aside>
         </div>
         <details className="help-panel">
           <summary>사용 방법과 현재 시작 상태</summary>
           <div>
             <p>
-              <strong>{activePreset.title}</strong>에서 시작했습니다. 큰 그림의
-              F/R/U와 작은 그림의 B/L/D는 언제나 같은 큐브를 보여 줍니다. 작은
-              그림은 뒤집어 본 모습이므로 D(흰색 센터)가 위에 보입니다.
+              <strong>
+                {session.lesson
+                  ? `F2L ${session.lesson.id}번 유형`
+                  : activePreset.title}
+              </strong>
+              에서 시작했습니다. 큰 그림의 F/R/U와 작은 그림의 B/L/D는 언제나
+              같은 큐브를 보여 줍니다. 작은 그림은 뒤집어 본 모습이므로 D(흰색
+              센터)가 위에 보입니다.
             </p>
+            <p>
+              수순 리셋은 현재 큐브를 유지하고 기록과 대기 입력만 비웁니다. 시작
+              상태로 되돌리기와 같은 배치 다시는 큐브도 처음 배치로 복원합니다.
+            </p>
+            {session.lesson && (
+              <p>
+                초보 1·2·3층 풀이와 십자가 만들기는 건너뜁니다. F2L은 준비된 두
+                조각의 페어링부터 연습합니다.{' '}
+                <a
+                  href="https://jperm.net/3x3/cfop/f2l"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  직관적 F2L 참고: J Perm
+                </a>
+              </p>
+            )}
             <p>
               좌우 화살표 또는 돌림 버튼은 전체 큐브를 수평으로 90° 회전합니다.
               노란 윗면에서 내려다볼 때 오른쪽은 시계 방향, 왼쪽은 반시계

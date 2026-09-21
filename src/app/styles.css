@@ -900,3 +900,333 @@ footer > span {
     transition: none;
   }
 }
+
+/* F2L uses the same simulator and controls; the lesson stays next to it. */
+.practice-modes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.practice-modes button,
+.lesson-mode button {
+  border: 1px solid #d5dfd0;
+  border-radius: 9px;
+  background: #fff;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+.practice-modes button[aria-pressed='true'],
+.lesson-mode button[aria-pressed='true'] {
+  color: #fff;
+  background: #35694f;
+  border-color: #35694f;
+}
+.practice-modes > span {
+  font-size: 11px;
+  color: #65765f;
+  margin-left: 6px;
+}
+.is-training {
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+.is-training .simulator {
+  position: sticky;
+  top: 16px;
+}
+.history-actions {
+  display: flex;
+  gap: 8px;
+}
+.history-actions .text-button {
+  min-height: 44px;
+}
+.lesson-panel {
+  background: #fff;
+  border: 1px solid #d6e1d0;
+  border-radius: 16px;
+  padding: 20px;
+}
+.lesson-panel p {
+  font-size: 12px;
+  line-height: 1.75;
+}
+.lesson-premise {
+  color: #587050;
+  margin: 12px 0 16px;
+}
+.lesson-picker {
+  display: grid;
+  gap: 6px;
+}
+.lesson-picker button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: #f6f8f2;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.lesson-picker button > span {
+  font-size: 11px;
+  color: #687c60;
+}
+.lesson-picker button[aria-pressed='true'] {
+  background: #e8f0e2;
+  border-color: #86a57c;
+  font-weight: 700;
+}
+.lesson-observation {
+  margin: 20px 0 16px;
+}
+.lesson-observation h3 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+.lesson-observation p {
+  margin: 8px 0;
+}
+.lesson-observation dl {
+  background: #f6f8f2;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.lesson-observation dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+}
+.lesson-observation dt {
+  font-weight: 700;
+}
+.lesson-observation dd {
+  margin: 0;
+}
+.focus-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  min-height: 44px;
+}
+.focus-control input {
+  width: 16px;
+  height: 16px;
+  accent-color: #35694f;
+}
+.lesson-detail {
+  font-size: 11px;
+  border-bottom: 1px solid #e4e9df;
+  padding-bottom: 10px;
+}
+.lesson-detail summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lesson-mode {
+  display: flex;
+  gap: 6px;
+}
+.lesson-mode button {
+  flex: 1;
+  padding: 8px;
+  font-size: 12px;
+}
+.lesson-feedback {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f1f5ed;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 14px 0;
+}
+.feedback-paired,
+.feedback-inserted {
+  background: #deeedc;
+  color: #285633;
+  font-weight: 650;
+}
+.lesson-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.lesson-stages li {
+  border: 1px solid #e3e9dd;
+  border-radius: 10px;
+  padding: 12px;
+}
+.lesson-stages li.active {
+  border-color: #739768;
+  box-shadow: inset 3px 0 #739768;
+  background: #fafcf7;
+}
+.lesson-stages li.complete h4 > span {
+  color: #35694f;
+}
+.lesson-stages h4 {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 12px;
+  margin: 0;
+}
+.lesson-stages h4 > span {
+  font-size: 11px;
+  color: #7d8c73;
+}
+.lesson-stages p {
+  margin: 8px 0;
+  color: #586a51;
+}
+.lesson-stages li:not(.active) p {
+  display: none;
+}
+.lesson-stages code {
+  display: block;
+  margin-top: 8px;
+  color: #2d573d;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  white-space: normal;
+}
+.lesson-panel .notation-note {
+  font-size: 10px;
+  color: #6f7a64;
+}
+.guide-notice {
+  padding: 10px;
+  background: #fff5e2;
+  border-radius: 8px;
+}
+.lesson-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lesson-actions button {
+  flex: 1;
+}
+.primary-button,
+.secondary-button {
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+.primary-button {
+  color: #fff;
+  background: #35694f;
+  border: 1px solid #35694f;
+}
+.secondary-button {
+  background: #f5f7f0;
+  border: 1px solid #d8e1d1;
+}
+.lesson-retry {
+  margin-top: 10px;
+}
+.lesson-panel .lesson-footnote {
+  font-size: 10px;
+  color: #708066;
+  margin-bottom: 0;
+}
+@media (max-width: 960px) and (min-width: 761px) {
+  .is-training {
+    grid-template-columns: minmax(0, 1fr) 310px;
+  }
+  .lesson-panel {
+    padding: 16px;
+  }
+}
+@media (max-width: 760px) {
+  .is-training {
+    grid-template-columns: 1fr;
+  }
+  .is-training .simulator {
+    top: 0;
+  }
+  .is-training .control-panel {
+    grid-template-columns: 1fr;
+  }
+  .practice-modes > span {
+    display: none;
+  }
+  .lesson-panel {
+    padding: 16px;
+  }
+  .lesson-picker {
+    grid-template-columns: 1fr 1fr;
+  }
+  .lesson-picker button {
+    padding: 8px;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .lesson-picker button:last-child {
+    grid-column: 1 / -1;
+  }
+  .history-actions {
+    gap: 5px;
+  }
+  .history-heading {
+    gap: 4px;
+  }
+  .is-training .control-panel :is(button, input, summary) {
+    scroll-margin-top: 440px;
+    scroll-margin-bottom: 16px;
+  }
+}
+@media (max-height: 700px) and (max-width: 760px) {
+  .history-panel {
+    display: block;
+    min-height: 0;
+    padding: 3px 12px 6px;
+  }
+  .history-panel .move-history {
+    display: none;
+  }
+}
+@media (max-height: 540px) {
+  .is-training .cube-stage {
+    max-width: 300px;
+    min-height: 0;
+    padding-top: 4px;
+  }
+  .is-training .stage-caption,
+  .is-training figcaption,
+  .is-training .face-legend {
+    display: none;
+  }
+  .is-training .secondary-cube {
+    padding-top: 0;
+  }
+  .is-training .stage-toolbar {
+    padding: 8px 12px 0;
+  }
+  .is-training .yaw-controls {
+    padding: 4px 8px;
+  }
+  .is-training .history-panel {
+    padding: 3px 12px;
+    min-height: 0;
+  }
+  .is-training .move-history {
+    display: none;
+  }
+}
