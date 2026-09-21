@@ -26,7 +26,7 @@ export const LESSONS: { id: LessonId; title: string; explanation: string }[] = [
     id: 1,
     title: 'W 옆 · 윗색 다름',
     explanation:
-      'W는 오른쪽, 코너 위는 G, 엣지 위는 R입니다. 대표 배치에서는 R 한 번으로 두 조각이 붙습니다. 붙인 페어를 비켜 놓고 열었던 면을 복원합니다.',
+      '대표 배치는 W가 오른쪽이고, 코너의 앞색 R은 이미 R 센터에 맞아 있습니다. R로 페어를 붙이고 U로 슬롯 위에 옮긴 뒤 R′로 함께 넣습니다. W가 왼쪽인 좌우 대칭 배치는 왼손 공식으로 끝납니다.',
   },
   {
     id: 2,
@@ -42,9 +42,9 @@ export const LESSONS: { id: LessonId; title: string; explanation: string }[] = [
   },
   {
     id: 4,
-    title: 'W 앞 · 윗색 다름',
+    title: 'W 앞 · 윗색 다름 (1번 회전형)',
     explanation:
-      'W는 앞, 코너 위는 R, 엣지 위는 G입니다. 대표 배치에서는 F′ 한 번으로 두 조각이 붙습니다. 붙인 페어를 비키고 면을 복원하는, 1번과 대칭인 유형입니다.',
+      '새로운 페어링 원리가 아니라 1번을 다른 방향에서 본 배치입니다. 대표 배치에서 큐브 전체를 →로 90° 돌리면 W가 왼쪽, 코너가 자기 앞·왼쪽 슬롯 위에 놓입니다. L′ U′ L로 바로 넣습니다.',
   },
   {
     id: 5,
@@ -61,6 +61,7 @@ type Variant = {
   pair: string;
   align: string;
   hint: string;
+  direct?: boolean;
 };
 const VARIANTS: Record<LessonId, Variant[]> = {
   1: [
@@ -68,9 +69,10 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       edge: 'UB',
       top: 'red',
       route: 'right',
-      pair: "R U2 R'",
-      align: "U'",
-      hint: 'R로 코너를 뒤쪽으로 보내 엣지와 붙입니다. U2로 페어를 오른쪽 면에서 비킨 뒤 R′로 W 십자가를 복원합니다.',
+      pair: "R U R'",
+      align: '',
+      direct: true,
+      hint: 'R로 코너와 엣지를 붙이고, U로 페어를 슬롯 위에 옮긴 뒤 R′로 넣습니다. W 십자가도 복원되며 세 수로 끝납니다.',
     },
     {
       edge: 'UL',
@@ -122,9 +124,10 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       edge: 'UL',
       top: 'green',
       route: 'left',
-      pair: "F' U2 F",
-      align: 'U',
-      hint: 'F′로 코너를 왼쪽으로 보내 엣지와 붙입니다. U2로 페어를 앞면에서 비킨 뒤 F로 W 십자가를 복원합니다.',
+      pair: "Y L' U' L",
+      align: '',
+      direct: true,
+      hint: '→로 전체 큐브를 돌려 G를 앞, R을 왼쪽으로 둡니다. 이제 1번의 W 왼쪽 배치이므로 L′ U′ L 세 수로 페어와 슬롯을 함께 완성합니다.',
     },
     {
       edge: 'UB',
@@ -257,30 +260,41 @@ export type Exercise = {
 function buildExercise(id: LessonId, variant: number): Exercise {
   const definition = VARIANTS[id][variant];
   const left = definition.route === 'left';
-  const sections = [
-    {
-      id: 'pair' as const,
-      title: '페어 만들기',
-      algorithm: definition.pair,
-      hint: definition.hint,
-    },
-    {
-      id: 'align' as const,
-      title: '삽입 위치 맞추기',
-      algorithm: [definition.align, left ? 'Y' : ''].filter(Boolean).join(' '),
-      hint: left
-        ? '페어를 슬롯 위에 맞춘 뒤 →로 큐브 전체를 돌립니다. 이제 G가 앞, R이 왼쪽이므로 같은 R·G 슬롯에 왼손 공식으로 넣습니다.'
-        : definition.align
-          ? 'U층만 돌려 붙어 있는 페어를 R·G 슬롯 바로 위에 놓습니다. 두 조각을 계속 함께 움직이세요.'
-          : '이미 페어가 R·G 슬롯 위에 있습니다. 추가 정렬 없이 오른손 삽입으로 이어갑니다.',
-    },
-    {
-      id: 'insert' as const,
-      title: left ? '왼쪽 앞으로 넣기' : '오른쪽 앞으로 넣기',
-      algorithm: left ? "U' L' U L" : "U R U' R'",
-      hint: '페어를 잠깐 비키고 슬롯을 연 뒤, 페어를 가져와 닫습니다. 네 수를 모두 연습합니다.',
-    },
-  ];
+  const sections = definition.direct
+    ? [
+        {
+          id: 'insert' as const,
+          title: '정답 · 페어링과 삽입을 한 번에',
+          algorithm: definition.pair,
+          hint: definition.hint,
+        },
+      ]
+    : [
+        {
+          id: 'pair' as const,
+          title: '페어 만들기',
+          algorithm: definition.pair,
+          hint: definition.hint,
+        },
+        {
+          id: 'align' as const,
+          title: '삽입 위치 맞추기',
+          algorithm: [definition.align, left ? 'Y' : '']
+            .filter(Boolean)
+            .join(' '),
+          hint: left
+            ? '페어를 슬롯 위에 맞춘 뒤 →로 큐브 전체를 돌립니다. 이제 G가 앞, R이 왼쪽이므로 같은 R·G 슬롯에 왼손 공식으로 넣습니다.'
+            : definition.align
+              ? 'U층만 돌려 붙어 있는 페어를 R·G 슬롯 바로 위에 놓습니다. 두 조각을 계속 함께 움직이세요.'
+              : '이미 페어가 R·G 슬롯 위에 있습니다. 추가 정렬 없이 오른손 삽입으로 이어갑니다.',
+        },
+        {
+          id: 'insert' as const,
+          title: left ? '왼쪽 앞으로 넣기' : '오른쪽 앞으로 넣기',
+          algorithm: left ? "U' L' U L" : "U R U' R'",
+          hint: '페어를 잠깐 비키고 슬롯을 연 뒤, 페어를 가져와 닫습니다. 네 수를 모두 연습합니다.',
+        },
+      ];
   const solution: Move[] = [];
   const stages = sections.map((section) => {
     const start = solution.length;

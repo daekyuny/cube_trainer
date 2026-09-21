@@ -70,10 +70,20 @@ for (const exercise of EXERCISES) {
       assert.equal(cornerUp === edgeUp, exercise.id === 2 || exercise.id === 3);
     assert.equal(isPairFormed(cube), false);
     assert.equal(isTargetInserted(cube), false);
-    const pair = exercise.checkpoints[exercise.stages[0].end];
+    const pair =
+      exercise.checkpoints[
+        exercise.definition.direct
+          ? exercise.id === 4
+            ? 2
+            : 1
+          : exercise.stages[0].end
+      ];
     assert.equal(isPairFormed(pair), true);
     assert.equal(isTargetInserted(pair), false);
-    assert.equal(trainingStatus(pair), 'paired');
+    assert.equal(
+      trainingStatus(pair),
+      exercise.definition.direct ? 'cross-broken' : 'paired',
+    );
     for (const stage of exercise.stages) {
       const checkpoint = exercise.checkpoints[stage.end];
       assert.ok(
@@ -90,7 +100,14 @@ for (const exercise of EXERCISES) {
         assert.equal(sticker.color, centerColor(checkpoint, face));
       }
     }
-    const ready = exercise.checkpoints[exercise.stages[1].end];
+    const ready =
+      exercise.checkpoints[
+        exercise.definition.direct
+          ? exercise.id === 4
+            ? 2
+            : 1
+          : exercise.stages[1].end
+      ];
     assert.ok(isPairFormed(ready));
     const insert =
       exercise.definition.route === 'right'
@@ -106,7 +123,9 @@ for (const exercise of EXERCISES) {
             { face: 'U', turns: 1 },
             { face: 'L', turns: 1 },
           ] as const);
-    const result = applyMoves(ready, insert);
+    const result = exercise.definition.direct
+      ? exercise.checkpoints.at(-1)!
+      : applyMoves(ready, insert);
     assert.ok(isTargetInserted(result));
     assert.ok(hasWhiteCross(result));
     assert.ok(isSolved(result));
@@ -140,12 +159,12 @@ test('F2L-04: guide progresses through repeated cube states without skipping the
 test('F2L-02: representative explanations agree with intermediate piece motion', () => {
   for (const id of [1, 4] as const) {
     const e = getExercise(id);
-    const first = e.checkpoints[1];
+    const first = e.checkpoints[id === 4 ? 2 : 1];
     assert.ok(isPairFormed(first));
     assert.equal(hasWhiteCross(first), false);
     assert.deepEqual(
       targetPieces(first).corner[0].position,
-      id === 1 ? [1, 1, -1] : [-1, 1, 1],
+      id === 1 ? [1, 1, -1] : [-1, 1, -1],
     );
   }
   for (const id of [2, 3] as const) {
@@ -157,6 +176,42 @@ test('F2L-02: representative explanations agree with intermediate piece motion',
   const edge = targetPieces(whiteUp.checkpoints[2]).edge;
   assert.deepEqual(edge[0].position, [1, 1, 0]);
   assert.equal(edge.find((s) => equal(s.normal, NORMALS.R))!.color, 'green');
+});
+
+test('F2L-06: case 1 finishes in R U R-prime; the left mirror finishes in L-prime U-prime L', () => {
+  const e = getExercise(1);
+  const right = [
+    { face: 'R', turns: 1 },
+    { face: 'U', turns: 1 },
+    { face: 'R', turns: -1 },
+  ] as const;
+  assert.deepEqual(e.solution, right);
+  assert.equal(e.stages.length, 1);
+  assert.equal(e.stages[0].end, 3);
+  assert.equal(trainingStatus(applyMoves(e.initial, right)), 'inserted');
+  assert.ok(isSolved(applyMoves(e.initial, right)));
+  // A different edge position is not covered by the representative shortcut.
+  assert.equal(
+    isTargetInserted(applyMoves(getExercise(1, 1).initial, right)),
+    false,
+  );
+  const left = [
+    { face: 'L', turns: -1 },
+    { face: 'U', turns: -1 },
+    { face: 'L', turns: 1 },
+  ] as const;
+  const mirror = applyMoves(solvedCube(), left.slice().reverse().map(inverse));
+  const corner = mirror.filter((s) => equal(s.position, [-1, 1, 1]));
+  assert.equal(corner.find((s) => equal(s.normal, NORMALS.L))!.color, 'white');
+  assert.equal(
+    corner.find((s) => equal(s.normal, NORMALS.F))!.color,
+    centerColor(mirror, 'F'),
+  );
+  const edge = mirror.filter((s) => equal(s.position, [0, 1, -1]));
+  assert.equal(edge.find((s) => equal(s.normal, NORMALS.U))!.color, 'red');
+  assert.equal(corner.find((s) => equal(s.normal, NORMALS.U))!.color, 'blue');
+  assert.ok(hasWhiteCross(mirror));
+  assert.ok(isSolved(applyMoves(mirror, left)));
 });
 
 test('F2L-03: actual state decides success; a broken cross is never success', () => {
@@ -177,5 +232,58 @@ test('F2L-03: actual state decides success; a broken cross is never success', ()
   assert.equal(
     guideCursor(e, applyMove(e.initial, { face: 'D', turns: 1 }), 0),
     null,
+  );
+});
+
+test('F2L-07: case 4 is the white-left view of case 1 after yaw, and needs only three face turns', () => {
+  const e = getExercise(4);
+  assert.deepEqual(e.solution, [
+    { face: 'Y', turns: 1 },
+    { face: 'L', turns: -1 },
+    { face: 'U', turns: -1 },
+    { face: 'L', turns: 1 },
+  ]);
+  const turned = e.checkpoints[1];
+  assert.ok(hasWhiteCross(turned));
+  assert.equal(centerColor(turned, 'F'), 'green');
+  assert.equal(centerColor(turned, 'L'), 'red');
+  const { corner, edge } = targetPieces(turned);
+  assert.deepEqual(corner[0].position, [-1, 1, 1]);
+  assert.deepEqual(edge[0].position, [0, 1, -1]);
+  assert.deepEqual(corner.find((s) => s.color === 'white')!.normal, NORMALS.L);
+  assert.equal(
+    corner.find((s) => equal(s.normal, NORMALS.F))!.color,
+    centerColor(turned, 'F'),
+  );
+  assert.notEqual(
+    corner.find((s) => equal(s.normal, NORMALS.U))!.color,
+    edge.find((s) => equal(s.normal, NORMALS.U))!.color,
+  );
+  assert.equal(trainingStatus(applyMoves(e.initial, e.solution)), 'inserted');
+  const withoutYaw = applyMoves(e.initial, [
+    { face: 'F', turns: -1 },
+    { face: 'U', turns: -1 },
+    { face: 'F', turns: 1 },
+  ]);
+  assert.equal(trainingStatus(withoutYaw), 'inserted');
+  assert.ok(isSolved(withoutYaw));
+  // The correction changes the solution, not the original starting arrangement.
+  const old = [
+    { face: 'F', turns: -1 },
+    { face: 'U', turns: 2 },
+    { face: 'F', turns: 1 },
+    { face: 'U', turns: 1 },
+    { face: 'Y', turns: 1 },
+    { face: 'U', turns: -1 },
+    { face: 'L', turns: -1 },
+    { face: 'U', turns: 1 },
+    { face: 'L', turns: 1 },
+  ] as const;
+  assert.deepEqual(
+    e.initial,
+    applyMoves(
+      applyMove(solvedCube(), { face: 'Y', turns: 1 }),
+      old.slice().reverse().map(inverse),
+    ),
   );
 });

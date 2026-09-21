@@ -27,8 +27,11 @@ export function LessonPanel({
   const definition = LESSONS.find((item) => item.id === lesson.id)!;
   const cursor = lesson.cursor;
   const busy = session.queue.length > 0;
-  const next = cursor === null ? undefined : exercise.solution[cursor];
   const status = trainingStatus(session.cube);
+  const next =
+    cursor === null || status === 'inserted'
+      ? undefined
+      : exercise.solution[cursor];
   const statusText =
     status === 'inserted'
       ? '삽입 완료 · W 십자가도 유지했습니다.'
@@ -152,7 +155,35 @@ export function LessonPanel({
                     {stage.title}
                   </h4>
                   <p>{stage.hint}</p>
-                  <code>{stage.algorithm || '추가 회전 없음'}</code>
+                  <code>
+                    {exercise.definition.direct && lesson.id === 1
+                      ? `W 오른쪽: ${stage.algorithm}`
+                      : stage.algorithm || '추가 회전 없음'}
+                  </code>
+                  {exercise.definition.direct && (
+                    <>
+                      <code>
+                        {lesson.id === 1
+                          ? 'W 왼쪽: L′ U′ L'
+                          : '현재 방향 그대로: F′ U′ F'}
+                      </code>
+                      <p className="mirror-answer">
+                        {lesson.id === 1 ? (
+                          <>
+                            현재 그림은 오른쪽 배치입니다. 왼쪽 공식은 코너가
+                            자기 앞·왼쪽 슬롯 위, 엣지가 뒤쪽에 있는 좌우 대칭
+                            배치에 적용합니다. 앞색은 앞 센터와 맞춥니다.
+                          </>
+                        ) : (
+                          <>
+                            →는 U면 회전이 아니라 전체 큐브 회전입니다. 시연은 →
+                            L′ U′ L을 사용합니다. 전체를 돌리지 않을 때는 F′ U′
+                            F로 같은 슬롯을 완성합니다.
+                          </>
+                        )}
+                      </p>
+                    </>
+                  )}
                 </li>
               );
             })}
@@ -175,9 +206,11 @@ export function LessonPanel({
             >
               {next
                 ? `다음 한 수 · ${notation(next)}`
-                : cursor === null
-                  ? '예시 수순에서 벗어남'
-                  : '예시 수순 완료'}
+                : status === 'inserted' && cursor === null
+                  ? '삽입 완료'
+                  : cursor === null
+                    ? '예시 수순에서 벗어남'
+                    : '예시 수순 완료'}
             </button>
             <button
               className="secondary-button"
@@ -206,8 +239,9 @@ export function LessonPanel({
         </button>
       </div>
       <p className="lesson-footnote">
-        최단 수순보다 원리를 익히는 연습입니다. 페어링 후 정렬과 4수 삽입을 따로
-        진행합니다.
+        {exercise.definition.direct
+          ? '이 대표 배치는 면 회전 세 수로 페어링과 삽입이 끝납니다. 추가 삽입 공식이 필요하지 않습니다.'
+          : '페어링 후 정렬과 삽입을 익히는 연습입니다. 준비된 배치에 맞는 수순을 사용하세요.'}
       </p>
     </section>
   );
