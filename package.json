@@ -9,9 +9,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:pages": "npm run build -- --mode pages",
     "preview": "vite preview",
     "test": "node --test tests/cube.test.ts tests/session.test.ts",
     "test:e2e": "playwright test",
+    "test:pages": "playwright test --config playwright.pages.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",

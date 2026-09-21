@@ -41,6 +41,34 @@ npm run dev
 
 브라우저 테스트를 처음 실행할 때 `npx playwright install --with-deps chromium`으로 필요한 브라우저와 시스템 라이브러리를 준비합니다. GitHub CI에서도 동일하게 설치한 뒤 검사·단위 테스트·빌드·브라우저 테스트를 수행합니다. 실제 모바일 기기의 터치 및 성능 검증은 별도로 필요합니다.
 
+## GitHub Pages 배포
+
+배포 주소: **https://daekyuny.github.io/cube_trainer/**
+
+`.github/workflows/ci.yml`의 **CI and Pages** 워크플로가 배포를 관리합니다.
+
+- `main` push: 타입·린트·포맷, 단위 테스트, 일반 빌드와 브라우저 테스트, Pages 빌드와 브라우저 테스트가 모두 성공하면 자동 배포합니다.
+- PR: 동일한 검증을 실행하며 배포하지 않습니다.
+- 수동 실행: GitHub Actions에서 **CI and Pages → Run workflow → main**을 선택합니다. 다른 브랜치에서 수동 실행하면 검증만 수행합니다.
+- 배포는 검증한 `dist/` 아티팩트를 그대로 사용합니다. 배포 job에만 Pages 쓰기 권한이 있으며 별도 배포 토큰을 저장할 필요가 없습니다.
+- `main` 실행은 동시에 배포하지 않도록 직렬화하고, PR은 새 커밋이 들어오면 이전 검증을 취소합니다.
+
+저장소 **Settings → Pages → Build and deployment → Source**는 **GitHub Actions**로 설정해야 합니다. 다른 저장소로 복제하여 배포하면 그 저장소에서도 Pages를 활성화하고 `vite.config.ts`의 Pages 경로와 `playwright.pages.config.ts`의 테스트 주소를 저장소 이름에 맞춰 변경합니다.
+
+로컬에서 실제 배포 빌드를 확인하려면:
+
+```sh
+npm run build:pages
+npm run test:pages
+npm run preview -- --mode pages
+```
+
+미리보기 기본 주소는 `http://localhost:4173/cube_trainer/`입니다. Pages 빌드와 미리보기는 `/cube_trainer/`, 일반 `npm run dev`와 `npm run build`는 `/`를 사용합니다. `test:pages`는 기존 `dist/`를 검사하므로 먼저 `build:pages`를 실행해야 합니다. 브라우저 설치 방법은 위 개발·검증 절을 따릅니다.
+
+배포 실패 시 Actions의 `check` 또는 `deploy` 로그를 확인합니다. 검사 실패 시 배포 job은 실행하지 않습니다. 이전 버전으로 돌아갈 때는 해당 변경을 되돌린 커밋을 `main`에 푸시하여 동일한 검증 후 다시 배포합니다. `dist/`나 별도 `gh-pages` 브랜치를 직접 커밋하지 않습니다.
+
+설정 참고: [GitHub Pages 사용자 지정 워크플로](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages), [Vite의 Pages 배포 가이드](https://vite.dev/guide/static-deploy.html#github-pages).
+
 ## 구조와 문서
 
 Codex로 작업할 때는 저장소 루트의 [AGENTS.md](AGENTS.md)를 공통 작업 지침으로 사용합니다.

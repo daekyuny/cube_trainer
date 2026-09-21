@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('keyboard rotates, Shift reverses, yaw changes the reference, presets reset', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('./');
   const stage = page.getByTestId('cube-stage');
   const history = page.getByLabel('회전 이력');
   const front = page.getByTestId('cube-front');
@@ -60,7 +60,7 @@ for (const direction of [
   test(`${direction.key}: keyboard and screen button share direction, history and undo`, async ({
     page,
   }) => {
-    await page.goto('/');
+    await page.goto('./');
     const front = page.getByTestId('cube-front');
     const back = page.getByTestId('cube-back');
     const stage = page.getByTestId('cube-stage');
@@ -123,7 +123,7 @@ for (const direction of [
 test('animation is visible in both views and reset cancels an in-flight queue', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByLabel('천천히 돌려 보기').check();
   const polygons = page.getByTestId('cube-front').locator('polygon');
   const before = await polygons.evaluateAll((nodes) =>
@@ -157,7 +157,7 @@ for (const width of [320, 390, 768, 1440]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto('/');
+    await page.goto('./');
     await expect(page.getByTestId('cube-front')).toBeVisible();
     await expect(page.getByTestId('cube-back')).toBeVisible();
     expect(
