@@ -43,6 +43,8 @@ npm run dev
 
 ## 구조와 문서
 
+Codex로 작업할 때는 저장소 루트의 [AGENTS.md](AGENTS.md)를 공통 작업 지침으로 사용합니다.
+
 ```text
 src/app/                 화면 구성·반응형 스타일
 src/domain/cube/         순수 상태 엔진·회전·프리셋
@@ -55,3 +57,20 @@ tests/                  상태 엔진 및 브라우저 테스트
 - [작업 순서](docs/ROADMAP.md): 완료 항목과 다음 논의
 
 현재 필요한 환경 변수나 외부 서비스는 없습니다. 개발 구성 참고: [Vite](https://vite.dev/guide/), [Playwright](https://playwright.dev/docs/test-configuration), [Node TypeScript 실행](https://nodejs.org/api/typescript.html).
+
+## 다른 PC에서 이어서 개발
+
+Git과 Node.js 24.x, Codex를 준비한 뒤 저장소를 clone합니다. GitHub와 Codex 인증은 각 PC에서 설정합니다.
+
+```sh
+git clone https://github.com/daekyuny/cube_trainer.git
+cd cube_trainer
+npm ci
+npm run dev
+```
+
+이미 clone한 PC에서는 작업 트리와 현재 브랜치를 확인하고, 미커밋 변경이 없으며 원격 변경을 바로 반영할 수 있을 때 `git pull --ff-only`로 최신 내용을 받습니다. 의존성이 변경되면 `npm ci`를 다시 실행합니다. 다른 PC의 미푸시 작업은 전달되지 않습니다.
+
+Codex에서 이 저장소 폴더를 프로젝트로 열고 새 세션을 시작하면 루트 `AGENTS.md`가 프로젝트 지침으로 로드됩니다. 기존 세션에서 파일을 갱신했다면 새 세션을 시작해 반영합니다. 개인 `AGENTS.override.md`나 하위 폴더 지침이 있으면 적용 지침이 달라질 수 있습니다. 자세한 동작은 [OpenAI 공식 AGENTS.md 문서](https://learn.chatgpt.com/docs/agent-configuration/agents-md)를 참고하세요.
+
+공유하는 것은 코드와 작업 지침이며, PC별 Codex 대화 기록·권한·인증 설정은 이 저장소로 복제되지 않습니다. 진행 상황은 PRD·기술 구조·ROADMAP과 Git 이력에 남깁니다.
