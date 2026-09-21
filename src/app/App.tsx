@@ -92,7 +92,7 @@ export function App() {
         event.preventDefault();
         dispatch({
           type: 'move',
-          move: { face: 'Y', turns: event.key === 'ArrowLeft' ? 1 : -1 },
+          move: { face: 'Y', turns: event.key === 'ArrowRight' ? 1 : -1 },
         });
       }
     };
@@ -199,22 +199,24 @@ export function App() {
             <div className="yaw-controls">
               <button
                 onClick={() =>
-                  dispatch({ type: 'move', move: { face: 'Y', turns: 1 } })
+                  dispatch({ type: 'move', move: { face: 'Y', turns: -1 } })
                 }
                 aria-label="큐브 전체 왼쪽으로 90도 회전"
+                title="윗면에서 내려다본 반시계 방향 · ←"
               >
                 <span aria-hidden="true">↶</span>{' '}
                 <span className="yaw-button-text">90°</span>
               </button>
               <div>
                 <strong>큐브 전체 돌리기</strong>
-                <span>← / → 키 · 앞면 기준도 함께 바뀝니다</span>
+                <span>윗면 기준 ← 반시계 · → 시계</span>
               </div>
               <button
                 onClick={() =>
-                  dispatch({ type: 'move', move: { face: 'Y', turns: -1 } })
+                  dispatch({ type: 'move', move: { face: 'Y', turns: 1 } })
                 }
                 aria-label="큐브 전체 오른쪽으로 90도 회전"
+                title="윗면에서 내려다본 시계 방향 · →"
               >
                 <span aria-hidden="true">↷</span>{' '}
                 <span className="yaw-button-text">90°</span>
@@ -367,6 +369,8 @@ export function App() {
             </p>
             <p>
               좌우 화살표 또는 돌림 버튼은 전체 큐브를 수평으로 90° 회전합니다.
+              노란 윗면에서 내려다볼 때 오른쪽은 시계 방향, 왼쪽은 반시계
+              방향입니다. 오른쪽 회전 후에는 기존 오른쪽 면이 새 앞면이 됩니다.
               위·아래 센터는 유지되고 앞·옆·뒤의 기준이 바뀝니다. 면 회전 중
               노랑·흰색 스티커는 다른 면으로 움직일 수 있습니다. 중간층 회전은
               지원하지 않습니다.

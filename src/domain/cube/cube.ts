@@ -124,7 +124,7 @@ export function applyMoves(cube: Cube, moves: readonly Move[]): Cube {
 }
 
 export function notation(move: Move): string {
-  if (move.face === 'Y') return move.turns === 1 ? '←' : '→';
+  if (move.face === 'Y') return move.turns === 1 ? '→' : '←';
   return move.face + (move.turns === -1 ? "'" : move.turns === 2 ? '2' : '');
 }
 
