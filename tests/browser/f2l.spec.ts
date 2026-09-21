@@ -42,7 +42,7 @@ test('F2L-01/03: five types start above the correct slot and demonstrate pairing
     );
     await expect(page.getByTestId('lesson-status')).toHaveAttribute(
       'data-status',
-      index === 0 || index === 3 ? 'inserted' : 'paired',
+      index === 0 ? 'inserted' : 'paired',
     );
     if (index === 0)
       await expect(page.getByLabel('회전 이력')).toHaveText("RUR'");
@@ -50,15 +50,15 @@ test('F2L-01/03: five types start above the correct slot and demonstrate pairing
     await expect(page.getByLabel('회전 이력')).toContainText('첫 회전');
     await expect(page.getByTestId('lesson-status')).toHaveAttribute(
       'data-status',
-      index === 0 || index === 3 ? 'inserted' : 'paired',
+      index === 0 ? 'inserted' : 'paired',
     );
-    if (index !== 0 && index !== 3 && index !== 4) {
+    if (index !== 0 && index !== 4) {
       await page.getByRole('button', { name: '이 단계 시연' }).click();
       await expect(page.getByTestId('cube-stage')).toHaveAttribute(
         'data-busy',
         'false',
       );
-      if (index === 1) {
+      if (index === 1 || index === 3) {
         await expect(page.getByTestId('cube-front')).toHaveAttribute(
           'aria-label',
           /F 초록, R 주황, U 노랑/,
@@ -68,7 +68,7 @@ test('F2L-01/03: five types start above the correct slot and demonstrate pairing
         );
       }
     }
-    if (index !== 0 && index !== 3)
+    if (index !== 0)
       await page.getByRole('button', { name: '이 단계 시연' }).click();
     await expect(page.getByTestId('lesson-status')).toHaveText(
       '삽입 완료 · W 십자가도 유지했습니다.',
@@ -135,7 +135,7 @@ test('F2L-04: manual keyboard practice, wrong turn, undo and history reset keep 
   await page.getByRole('button', { name: '같은 배치 다시' }).click();
   await page.getByText('색 문자와 시작 조건', { exact: true }).click();
   await page
-    .getByRole('button', { name: '다른 엣지 배치 (1/2)', exact: true })
+    .getByRole('button', { name: '같은 유형의 다른 배치 (1/2)', exact: true })
     .click();
   await expect(page.locator('.lesson-observation')).toContainText('Y층 왼쪽');
   await expect(page.getByTestId('lesson-status')).toHaveAttribute(
@@ -144,47 +144,61 @@ test('F2L-04: manual keyboard practice, wrong turn, undo and history reset keep 
   );
 });
 
-test('F2L-07: case 4 shows its relationship to case 1, yaw plus left insert and the no-yaw equivalent', async ({
+test('F2L-07: case 4 changes the actual edge position and requires pairing; the simple left variant belongs to case 1', async ({
   page,
 }) => {
   await page.locator('.lesson-picker button').nth(3).click();
-  await expect(page.locator('.lesson-observation h3')).toContainText(
+  await expect(page.locator('.lesson-observation')).toContainText('W는 앞');
+  await expect(page.locator('.lesson-observation')).toContainText('Y층 뒤쪽');
+  await expect(page.locator('.lesson-observation h3')).not.toContainText(
     '1번 회전형',
   );
-  await expect(page.getByTestId('stage-insert')).toContainText("→ L' U' L");
-  await expect(page.getByTestId('stage-insert')).toContainText(
-    '현재 방향 그대로: F′ U′ F',
-  );
-  await page
-    .getByRole('button', { name: '다음 한 수 · →', exact: true })
-    .click();
+  await expect(page.locator('.lesson-stages li')).toHaveCount(3);
+  for (const key of ['Shift+f', 'Shift+u', 'f']) await page.keyboard.press(key);
   await expect(page.getByTestId('cube-stage')).toHaveAttribute(
     'data-busy',
     'false',
   );
-  await expect(page.getByTestId('cube-front')).toHaveAttribute(
-    'aria-label',
-    /F 초록, R 주황, U 노랑/,
+  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
+    'data-status',
+    'working',
   );
-  await expect(
-    page.getByRole('button', { name: "다음 한 수 · L'", exact: true }),
-  ).toBeEnabled();
-  for (const key of ['Shift+l', 'Shift+u', 'l']) await page.keyboard.press(key);
+  await expect(page.locator('.live-badge')).toHaveText('흰색 십자가 완성');
+  await page.getByRole('button', { name: '같은 배치 다시' }).click();
+  await page.getByRole('button', { name: '이 단계 시연' }).click();
+  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
+    'data-status',
+    'paired',
+  );
+  await page.getByRole('button', { name: '이 단계 시연' }).click();
+  await expect(page.getByTestId('cube-stage')).toHaveAttribute(
+    'data-busy',
+    'false',
+  );
+  await page.getByRole('button', { name: '이 단계 시연' }).click();
+  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
+    'data-status',
+    'inserted',
+  );
+
+  await page.locator('.lesson-picker button').nth(0).click();
+  await page.getByText('색 문자와 시작 조건', { exact: true }).click();
+  await page
+    .getByRole('button', { name: '같은 유형의 다른 배치 (1/2)', exact: true })
+    .click();
+  await expect(page.locator('.lesson-observation')).toContainText('W는 앞');
+  await expect(page.locator('.lesson-observation')).toContainText('Y층 왼쪽');
+  await expect(page.locator('.lesson-stages li')).toHaveCount(1);
+  await expect(page.getByTestId('stage-insert')).toContainText("→ L' U' L");
+  await expect(page.getByTestId('stage-insert')).toContainText(
+    'W 왼쪽: L′ U′ L',
+  );
+  await page.getByRole('button', { name: '이 단계 시연' }).click();
   await expect(page.getByTestId('lesson-status')).toHaveAttribute(
     'data-status',
     'inserted',
   );
   await expect(page.locator('.move-count')).toHaveText('3 moves');
-  await expect(page.getByLabel('회전 이력')).toHaveText("→L'U'L");
-  await page.getByRole('button', { name: '같은 배치 다시' }).click();
-  for (const key of ['Shift+f', 'Shift+u', 'f']) await page.keyboard.press(key);
-  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
-    'data-status',
-    'inserted',
-  );
-  await expect(
-    page.getByRole('button', { name: '삽입 완료', exact: true }),
-  ).toBeDisabled();
 });
 
 test('SESSION-03/04: reset and restart cancel animation, and switching modes cancels demonstration', async ({
@@ -210,7 +224,7 @@ test('SESSION-03/04: reset and restart cancel animation, and switching modes can
     'false',
   );
   await expect(page.locator('.lesson-observation h3')).toHaveText(
-    '2. W 옆 · 윗색 같음',
+    '2. 윗색 같음 · W 반대편',
   );
   await page.getByRole('button', { name: '이 단계 시연' }).click();
   await page.getByRole('button', { name: '자유 연습', exact: true }).click();

@@ -68,11 +68,14 @@ export function LessonPanel({
         <h3>
           {lesson.id}. {definition.title}
         </h3>
-        <p>{definition.explanation}</p>
+        {showGuide && <p>{definition.explanation}</p>}
         <dl>
           <div>
             <dt>시작 코너 C</dt>
-            <dd>W·R·G / R·G 슬롯 바로 위</dd>
+            <dd>
+              W·R·G / R·G 슬롯 바로 위 · W는{' '}
+              {{ R: '오른쪽', F: '앞', U: '위' }[exercise.definition.whiteFace]}
+            </dd>
           </div>
           <div>
             <dt>시작 엣지 E</dt>
@@ -103,8 +106,9 @@ export function LessonPanel({
             왼쪽 또는 뒤쪽입니다.
           </p>
           <p>
-            먼저 이 대표 배치로 원리를 익히세요. 같은 유형의 다른 배치는 준비
-            동작이 달라질 수 있습니다.
+            먼저 이 대표 배치로 원리를 익히세요. 윗색의 같음·다름과 W 방향에
+            대한 엣지의 위치를 함께 구분합니다. 전체 수평 회전이나 좌우 대칭은
+            별도 유형으로 세지 않습니다.
           </p>
           <button
             className="secondary-button"
@@ -116,7 +120,7 @@ export function LessonPanel({
               })
             }
           >
-            다른 엣지 배치 ({lesson.variant + 1}/{exercise.variantCount})
+            같은 유형의 다른 배치 ({lesson.variant + 1}/{exercise.variantCount})
           </button>
         </details>
       </div>
@@ -156,19 +160,16 @@ export function LessonPanel({
                   </h4>
                   <p>{stage.hint}</p>
                   <code>
-                    {exercise.definition.direct && lesson.id === 1
+                    {exercise.definition.direct &&
+                    exercise.definition.route === 'right'
                       ? `W 오른쪽: ${stage.algorithm}`
                       : stage.algorithm || '추가 회전 없음'}
                   </code>
                   {exercise.definition.direct && (
                     <>
-                      <code>
-                        {lesson.id === 1
-                          ? 'W 왼쪽: L′ U′ L'
-                          : '현재 방향 그대로: F′ U′ F'}
-                      </code>
+                      <code>W 왼쪽: L′ U′ L</code>
                       <p className="mirror-answer">
-                        {lesson.id === 1 ? (
+                        {exercise.definition.route === 'right' ? (
                           <>
                             현재 그림은 오른쪽 배치입니다. 왼쪽 공식은 코너가
                             자기 앞·왼쪽 슬롯 위, 엣지가 뒤쪽에 있는 좌우 대칭
@@ -176,9 +177,10 @@ export function LessonPanel({
                           </>
                         ) : (
                           <>
-                            →는 U면 회전이 아니라 전체 큐브 회전입니다. 시연은 →
-                            L′ U′ L을 사용합니다. 전체를 돌리지 않을 때는 F′ U′
-                            F로 같은 슬롯을 완성합니다.
+                            W 오른쪽 정답은 R U R′입니다. 현재 그림은 →로 전체를
+                            돌리면 W 왼쪽 배치가 됩니다. 시연은 → L′ U′ L을
+                            사용합니다. 전체를 돌리지 않을 때는 F′ U′ F로 같은
+                            슬롯을 완성합니다.
                           </>
                         )}
                       </p>

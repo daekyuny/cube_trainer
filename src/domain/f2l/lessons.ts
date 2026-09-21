@@ -24,27 +24,27 @@ export const COLOR_LETTERS: Record<Color, string> = {
 export const LESSONS: { id: LessonId; title: string; explanation: string }[] = [
   {
     id: 1,
-    title: 'W 옆 · 윗색 다름',
+    title: '윗색 다름 · 바로 넣기',
     explanation:
-      '대표 배치는 W가 오른쪽이고, 코너의 앞색 R은 이미 R 센터에 맞아 있습니다. R로 페어를 붙이고 U로 슬롯 위에 옮긴 뒤 R′로 함께 넣습니다. W가 왼쪽인 좌우 대칭 배치는 왼손 공식으로 끝납니다.',
+      'W는 옆을 보고, 엣지는 W가 보는 면의 반대편에 있지 않습니다. 코너 앞색을 앞 센터에 맞춰 보면 W 오른쪽은 R U R′, W 왼쪽은 L′ U′ L로 바로 끝납니다.',
   },
   {
     id: 2,
-    title: 'W 옆 · 윗색 같음',
+    title: '윗색 같음 · W 반대편',
     explanation:
-      'W는 오른쪽, 두 조각의 윗색은 G입니다. 코너를 앞면으로 숨길 위치에 옮긴 뒤 엣지를 만나게 합니다. 윗색이 같다는 것만으로 페어가 된 것은 아닙니다.',
+      'W는 옆을 보고, 엣지는 W가 보는 면의 반대편에 있습니다. 코너를 숨긴 뒤 U 또는 U′ 한 번으로 엣지를 만나게 하고 코너를 올려 페어를 만듭니다.',
   },
   {
     id: 3,
-    title: 'W 앞 · 윗색 같음',
+    title: '윗색 같음 · 다른 분리 자리',
     explanation:
-      'W는 앞, 두 조각의 윗색은 R입니다. 코너를 오른쪽 면으로 숨길 위치에 옮긴 뒤 엣지를 만나게 합니다. 2번과 대칭으로 생각해 보세요.',
+      '윗색은 2번처럼 같지만, 엣지가 W가 보는 면의 반대편에 있지 않습니다. 코너를 숨긴 뒤 엣지를 U2로 옮겨 만나게 합니다. 전체 큐브를 돌려도 이 위치 관계는 바뀌지 않습니다.',
   },
   {
     id: 4,
-    title: 'W 앞 · 윗색 다름 (1번 회전형)',
+    title: '윗색 다름 · W 반대편',
     explanation:
-      '새로운 페어링 원리가 아니라 1번을 다른 방향에서 본 배치입니다. 대표 배치에서 큐브 전체를 →로 90° 돌리면 W가 왼쪽, 코너가 자기 앞·왼쪽 슬롯 위에 놓입니다. L′ U′ L로 바로 넣습니다.',
+      '윗색은 1번처럼 다르지만, 엣지가 W가 보는 면의 반대편에 있습니다. 대표 배치는 W가 앞, 엣지가 뒤입니다. 1번의 세 수로는 코너만 들어가므로, 이어서 엣지와 페어를 만들어 올린 뒤 함께 넣습니다.',
   },
   {
     id: 5,
@@ -55,6 +55,7 @@ export const LESSONS: { id: LessonId; title: string; explanation: string }[] = [
 ];
 
 type Variant = {
+  whiteFace: 'R' | 'F' | 'U';
   edge: 'UL' | 'UB';
   top: 'red' | 'green';
   route: 'right' | 'left';
@@ -66,6 +67,7 @@ type Variant = {
 const VARIANTS: Record<LessonId, Variant[]> = {
   1: [
     {
+      whiteFace: 'R',
       edge: 'UB',
       top: 'red',
       route: 'right',
@@ -75,16 +77,19 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       hint: 'R로 코너와 엣지를 붙이고, U로 페어를 슬롯 위에 옮긴 뒤 R′로 넣습니다. W 십자가도 복원되며 세 수로 끝납니다.',
     },
     {
+      whiteFace: 'F',
       edge: 'UL',
-      top: 'red',
-      route: 'right',
-      pair: "R U R' F' U F",
+      top: 'green',
+      route: 'left',
+      pair: "Y L' U' L",
       align: '',
-      hint: 'R U R′로 배치를 바꾸고 F′ U F로 연결합니다. 각 묶음이 끝나면 W 십자가도 복원됩니다.',
+      direct: true,
+      hint: '→로 전체 큐브를 돌려 G를 앞, R을 왼쪽으로 둡니다. W가 왼쪽에 놓이면 L′ U′ L 세 수로 페어와 슬롯을 함께 완성합니다.',
     },
   ],
   2: [
     {
+      whiteFace: 'R',
       edge: 'UL',
       top: 'green',
       route: 'left',
@@ -93,6 +98,27 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       hint: 'U로 코너를 옮기고 F′로 아래에 숨깁니다. U′로 엣지를 옮긴 뒤 F로 코너를 올려 엣지와 붙입니다.',
     },
     {
+      whiteFace: 'F',
+      edge: 'UB',
+      top: 'red',
+      route: 'right',
+      pair: "U' R U R'",
+      align: 'U',
+      hint: 'U′로 코너를 옮기고 R로 아래에 숨깁니다. U로 엣지를 옮긴 뒤 R′로 코너를 올려 엣지와 붙입니다.',
+    },
+  ],
+  3: [
+    {
+      whiteFace: 'F',
+      edge: 'UL',
+      top: 'red',
+      route: 'right',
+      pair: "U' R U2 R'",
+      align: 'U',
+      hint: 'U′로 코너를 옮겨 R로 숨깁니다. 엣지가 왼쪽에서 시작하므로 U2로 만나게 한 뒤 R′로 올립니다.',
+    },
+    {
+      whiteFace: 'R',
       edge: 'UB',
       top: 'green',
       route: 'left',
@@ -101,45 +127,29 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       hint: 'U로 코너를 옮겨 F′로 숨깁니다. 엣지가 뒤에서 시작하므로 U2로 만나게 한 뒤 F로 올립니다.',
     },
   ],
-  3: [
-    {
-      edge: 'UB',
-      top: 'red',
-      route: 'right',
-      pair: "U' R U R'",
-      align: 'U',
-      hint: 'U′로 코너를 옮기고 R로 아래에 숨깁니다. U로 엣지를 옮긴 뒤 R′로 코너를 올려 엣지와 붙입니다.',
-    },
-    {
-      edge: 'UL',
-      top: 'red',
-      route: 'right',
-      pair: "U' R U2 R'",
-      align: 'U',
-      hint: 'U′로 코너를 옮겨 R로 숨깁니다. 엣지가 왼쪽에서 시작하므로 U2로 만나게 한 뒤 R′로 올립니다.',
-    },
-  ],
   4: [
     {
-      edge: 'UL',
-      top: 'green',
-      route: 'left',
-      pair: "Y L' U' L",
-      align: '',
-      direct: true,
-      hint: '→로 전체 큐브를 돌려 G를 앞, R을 왼쪽으로 둡니다. 이제 1번의 W 왼쪽 배치이므로 L′ U′ L 세 수로 페어와 슬롯을 함께 완성합니다.',
-    },
-    {
+      whiteFace: 'F',
       edge: 'UB',
       top: 'green',
       route: 'left',
       pair: "F' U' F R U' R'",
       align: '',
-      hint: 'F′ U′ F로 배치를 바꾸고 R U′ R′로 연결합니다. 각 묶음이 끝나면 W 십자가도 복원됩니다.',
+      hint: 'F′ U′ F로 코너를 자기 슬롯에 넣습니다. 아직 엣지는 Y층에 있습니다. R U′ R′로 둘을 붙여 Y층으로 올립니다. 각 묶음이 끝나면 W 십자가도 복원됩니다.',
+    },
+    {
+      whiteFace: 'R',
+      edge: 'UL',
+      top: 'red',
+      route: 'right',
+      pair: "R U R' F' U F",
+      align: '',
+      hint: 'R U R′로 코너를 자기 슬롯에 넣습니다. 아직 엣지는 Y층에 있습니다. F′ U F로 둘을 붙여 Y층으로 올립니다. 각 묶음이 끝나면 W 십자가도 복원됩니다.',
     },
   ],
   5: [
     {
+      whiteFace: 'U',
       edge: 'UL',
       top: 'red',
       route: 'right',
@@ -148,6 +158,7 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       hint: 'U2로 엣지의 G를 오른쪽 G 센터에 맞춥니다. R로 엣지를 내리고 U로 코너를 옮긴 뒤 R′로 붙입니다.',
     },
     {
+      whiteFace: 'U',
       edge: 'UB',
       top: 'red',
       route: 'right',
@@ -156,6 +167,7 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       hint: 'U로 엣지의 G를 오른쪽 G 센터에 맞춥니다. R로 엣지를 내리고 U2로 코너를 옮긴 뒤 R′로 붙입니다.',
     },
     {
+      whiteFace: 'U',
       edge: 'UB',
       top: 'green',
       route: 'left',
@@ -164,6 +176,7 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       hint: 'U2로 엣지의 R을 앞쪽 R 센터에 맞춥니다. F′로 엣지를 내리고 U′로 코너를 옮긴 뒤 F로 붙입니다.',
     },
     {
+      whiteFace: 'U',
       edge: 'UL',
       top: 'green',
       route: 'left',
