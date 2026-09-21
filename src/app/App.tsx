@@ -118,10 +118,10 @@ export function App() {
   const activePreset = presets.find((preset) => preset.id === session.preset)!;
   const pairStatus = session.lesson ? trainingStatus(session.cube) : null;
   const stageStatus =
-    pairStatus === 'inserted'
-      ? 'R·G 슬롯 완성 · W 십자 유지'
-      : pairStatus === 'paired'
-        ? '페어 완성 · W 십자 유지'
+    pairStatus === 'paired'
+      ? '페어 완성 · W 십자 유지'
+      : pairStatus === 'pair-cross-broken'
+        ? '페어 연결 · W 십자 복원 중'
         : cubeStatus;
   const facesLegend = (faces: Face[]) =>
     faces.map((face) => (
@@ -231,7 +231,7 @@ export function App() {
             </div>
             <div className="stage-caption">
               {session.lesson
-                ? 'C: W·R·G 코너 · E: R·G 엣지 / 두 그림은 같은 큐브입니다.'
+                ? 'R·G·W 코너 · R·G 엣지 / 두 그림은 같은 큐브입니다.'
                 : '같은 큐브의 여섯 면을 함께 보고 있어요.'}
             </div>
             <div className="yaw-controls">

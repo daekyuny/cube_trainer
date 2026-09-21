@@ -1052,8 +1052,7 @@ footer > span {
   line-height: 1.7;
   margin: 14px 0;
 }
-.feedback-paired,
-.feedback-inserted {
+.feedback-paired {
   background: #deeedc;
   color: #285633;
   font-weight: 650;

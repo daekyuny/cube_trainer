@@ -120,7 +120,7 @@ test('SESSION-03: history reset preserves the committed cube and guidance, cance
 test('SESSION-04: restart restores the exact random/exercise start and cancels old commands', () => {
   for (const initial of [
     createSession('random'),
-    sessionReducer(createSession(), { type: 'lesson', id: 5, variant: 3 }),
+    sessionReducer(createSession(), { type: 'lesson', id: 5, variant: 1 }),
   ]) {
     let session = drain(
       sessionReducer(initial, { type: 'move', move: { face: 'Y', turns: 1 } }),
@@ -152,13 +152,11 @@ test('F2L-04: demonstration, manual input, reset, undo and lesson switches share
   );
   session = drain(session);
   assert.equal(trainingStatus(session.cube), 'paired');
-  session = sessionReducer(session, { type: 'clear-history' });
-  for (const move of e.solution.slice(e.stages[0].end))
-    session = drain(sessionReducer(session, { type: 'move', move }));
-  assert.equal(trainingStatus(session.cube), 'inserted');
+  assert.equal(sessionReducer(session, { type: 'guide' }), session);
   assert.equal(session.lesson!.cursor, e.solution.length);
   session = drain(sessionReducer(session, { type: 'undo' }));
   assert.equal(session.lesson!.cursor, e.solution.length - 1);
+  session = sessionReducer(session, { type: 'clear-history' });
   session = sessionReducer(session, { type: 'guide' });
   const stale = session.queue[0];
   session = sessionReducer(session, { type: 'lesson', id: 4 });

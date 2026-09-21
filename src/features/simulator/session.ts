@@ -1,6 +1,10 @@
 import { applyMove, inverse, makePreset } from '../../domain/cube/cube.ts';
 import type { Cube, Move, Preset } from '../../domain/cube/cube.ts';
-import { getExercise, guideCursor } from '../../domain/f2l/lessons.ts';
+import {
+  getExercise,
+  guideCursor,
+  trainingStatus,
+} from '../../domain/f2l/lessons.ts';
 import type { LessonId } from '../../domain/f2l/lessons.ts';
 
 export type QueuedMove = { move: Move; undo?: boolean };
@@ -78,7 +82,12 @@ export function sessionReducer(state: Session, action: Action): Session {
     };
   }
   if (action.type === 'guide') {
-    if (state.queue.length || !state.lesson || state.lesson.cursor === null)
+    if (
+      state.queue.length ||
+      !state.lesson ||
+      state.lesson.cursor === null ||
+      trainingStatus(state.cube) === 'paired'
+    )
       return state;
     const exercise = getExercise(state.lesson.id, state.lesson.variant);
     const cursor = state.lesson.cursor;

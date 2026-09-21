@@ -1,18 +1,13 @@
 import {
   applyMove,
   applyMoves,
-  centerColor,
   equal,
-  FACES,
   hasWhiteCross,
-  inverse,
-  NORMALS,
   solvedCube,
 } from '../cube/cube.ts';
 import type { Color, Cube, Move, Sticker } from '../cube/cube.ts';
 
 export type LessonId = 1 | 2 | 3 | 4 | 5;
-export type StageId = 'pair' | 'align' | 'insert';
 export const COLOR_LETTERS: Record<Color, string> = {
   white: 'W',
   yellow: 'Y',
@@ -24,165 +19,95 @@ export const COLOR_LETTERS: Record<Color, string> = {
 export const LESSONS: { id: LessonId; title: string; explanation: string }[] = [
   {
     id: 1,
-    title: '윗색 다름 · 바로 넣기',
+    title: 'W 오른쪽 · 윗색 다름',
     explanation:
-      'W는 옆을 보고, 엣지는 W가 보는 면의 반대편에 있지 않습니다. 코너 앞색을 앞 센터에 맞춰 보면 W 오른쪽은 R U R′, W 왼쪽은 L′ U′ L로 바로 끝납니다.',
+      '코너의 W는 G 센터 쪽을 보고, 두 조각의 윗색은 G와 R로 다릅니다. 오른쪽 면을 열면 바로 페어가 붙습니다.',
   },
   {
     id: 2,
-    title: '윗색 같음 · W 반대편',
+    title: 'W 오른쪽 · 윗색 같음',
     explanation:
-      'W는 옆을 보고, 엣지는 W가 보는 면의 반대편에 있습니다. 코너를 숨긴 뒤 U 또는 U′ 한 번으로 엣지를 만나게 하고 코너를 올려 페어를 만듭니다.',
+      '코너의 W는 G 센터 쪽을 보고, 두 조각의 윗색은 모두 G입니다. 코너를 숨기고 엣지를 앞으로 가져옵니다.',
   },
   {
     id: 3,
-    title: '윗색 같음 · 다른 분리 자리',
+    title: 'W 앞 · 윗색 다름',
     explanation:
-      '윗색은 2번처럼 같지만, 엣지가 W가 보는 면의 반대편에 있지 않습니다. 코너를 숨긴 뒤 엣지를 U2로 옮겨 만나게 합니다. 전체 큐브를 돌려도 이 위치 관계는 바뀌지 않습니다.',
+      '코너의 W는 R 센터 쪽을 보고, 두 조각의 윗색은 R과 G로 다릅니다. 뒤쪽 엣지를 그대로 두고 코너를 왼쪽으로 돌아 만나게 합니다.',
   },
   {
     id: 4,
-    title: '윗색 다름 · W 반대편',
+    title: 'W 앞 · 윗색 같음',
     explanation:
-      '윗색은 1번처럼 다르지만, 엣지가 W가 보는 면의 반대편에 있습니다. 대표 배치는 W가 앞, 엣지가 뒤입니다. 1번의 세 수로는 코너만 들어가므로, 이어서 엣지와 페어를 만들어 올린 뒤 함께 넣습니다.',
+      '코너의 W는 R 센터 쪽을 보고, 두 조각의 윗색은 모두 R입니다. 앞면으로 코너를 숨기고 엣지를 오른쪽으로 가져옵니다.',
   },
   {
     id: 5,
     title: 'W 위',
     explanation:
-      'W가 위를 봅니다. 먼저 엣지의 옆색을 같은 색 센터에 맞춥니다. 그 면을 열어 엣지를 잠시 내리고, 코너를 옮긴 뒤 면을 되돌려 페어를 만듭니다.',
+      '코너의 W는 Y 센터 쪽을 봅니다. 뒤쪽 엣지를 내리고 코너를 옮긴 뒤 다시 올려 붙입니다. 엣지의 윗색 R/G에 따라 수순이 달라집니다.',
   },
 ];
-
 type Variant = {
   whiteFace: 'R' | 'F' | 'U';
-  edge: 'UL' | 'UB';
   top: 'red' | 'green';
-  route: 'right' | 'left';
+  setup: string;
   pair: string;
-  align: string;
   hint: string;
-  direct?: boolean;
 };
+// All starts have the same UFR corner and UB edge. Only orientations vary.
+// Setup sequences are independent of the pairing answer and use legal turns.
 const VARIANTS: Record<LessonId, Variant[]> = {
   1: [
     {
       whiteFace: 'R',
-      edge: 'UB',
       top: 'red',
-      route: 'right',
-      pair: "R U R'",
-      align: '',
-      direct: true,
-      hint: 'R로 코너와 엣지를 붙이고, U로 페어를 슬롯 위에 옮긴 뒤 R′로 넣습니다. W 십자가도 복원되며 세 수로 끝납니다.',
-    },
-    {
-      whiteFace: 'F',
-      edge: 'UL',
-      top: 'green',
-      route: 'left',
-      pair: "Y L' U' L",
-      align: '',
-      direct: true,
-      hint: '→로 전체 큐브를 돌려 G를 앞, R을 왼쪽으로 둡니다. W가 왼쪽에 놓이면 L′ U′ L 세 수로 페어와 슬롯을 함께 완성합니다.',
+      setup: "R U' R'",
+      pair: "R U' R'",
+      hint: 'R에서 두 조각이 Y층에서 붙습니다. U′로 붙은 페어를 오른쪽 면에서 비킨 뒤 R′로 W 십자가를 복원합니다. 페어는 Y층에 둡니다.',
     },
   ],
   2: [
     {
       whiteFace: 'R',
-      edge: 'UL',
       top: 'green',
-      route: 'left',
-      pair: "U F' U' F",
-      align: "U'",
-      hint: 'U로 코너를 옮기고 F′로 아래에 숨깁니다. U′로 엣지를 옮긴 뒤 F로 코너를 올려 엣지와 붙입니다.',
-    },
-    {
-      whiteFace: 'F',
-      edge: 'UB',
-      top: 'red',
-      route: 'right',
-      pair: "U' R U R'",
-      align: 'U',
-      hint: 'U′로 코너를 옮기고 R로 아래에 숨깁니다. U로 엣지를 옮긴 뒤 R′로 코너를 올려 엣지와 붙입니다.',
+      setup: "Y L' U' L U Y' U F' U' U' F U'",
+      pair: "R' U2 R",
+      hint: 'R′로 코너를 아래에 숨깁니다. U2로 뒤쪽 엣지를 앞으로 옮긴 뒤 R로 코너를 올려 엣지와 붙입니다.',
     },
   ],
   3: [
     {
       whiteFace: 'F',
-      edge: 'UL',
-      top: 'red',
-      route: 'right',
-      pair: "U' R U2 R'",
-      align: 'U',
-      hint: 'U′로 코너를 옮겨 R로 숨깁니다. 엣지가 왼쪽에서 시작하므로 U2로 만나게 한 뒤 R′로 올립니다.',
-    },
-    {
-      whiteFace: 'R',
-      edge: 'UB',
       top: 'green',
-      route: 'left',
-      pair: "U F' U2 F",
-      align: "U'",
-      hint: 'U로 코너를 옮겨 F′로 숨깁니다. 엣지가 뒤에서 시작하므로 U2로 만나게 한 뒤 F로 올립니다.',
+      setup: "Y L' U' L U Y' R U R' F' U F",
+      pair: "F' L F L'",
+      hint: 'F′로 코너를 왼쪽 위로 보냅니다. L로 아래에 내리고 F로 앞면을 복원한 뒤 L′로 코너를 뒤쪽 위에 올려 엣지와 붙입니다. 엣지는 뒤쪽 위에 그대로 있습니다.',
     },
   ],
   4: [
     {
       whiteFace: 'F',
-      edge: 'UB',
-      top: 'green',
-      route: 'left',
-      pair: "F' U' F R U' R'",
-      align: '',
-      hint: 'F′ U′ F로 코너를 자기 슬롯에 넣습니다. 아직 엣지는 Y층에 있습니다. R U′ R′로 둘을 붙여 Y층으로 올립니다. 각 묶음이 끝나면 W 십자가도 복원됩니다.',
-    },
-    {
-      whiteFace: 'R',
-      edge: 'UL',
       top: 'red',
-      route: 'right',
-      pair: "R U R' F' U F",
-      align: '',
-      hint: 'R U R′로 코너를 자기 슬롯에 넣습니다. 아직 엣지는 Y층에 있습니다. F′ U F로 둘을 붙여 Y층으로 올립니다. 각 묶음이 끝나면 W 십자가도 복원됩니다.',
+      setup: "R U R' U' U' R U' R' U",
+      pair: "F U F'",
+      hint: 'F로 코너를 아래에 숨깁니다. U로 뒤쪽 엣지를 오른쪽으로 옮긴 뒤 F′로 코너를 올려 엣지와 붙입니다.',
     },
   ],
   5: [
     {
       whiteFace: 'U',
-      edge: 'UL',
       top: 'red',
-      route: 'right',
-      pair: "U2 R U R'",
-      align: '',
-      hint: 'U2로 엣지의 G를 오른쪽 G 센터에 맞춥니다. R로 엣지를 내리고 U로 코너를 옮긴 뒤 R′로 붙입니다.',
+      setup: "R U R' U' R U' U' R' U'",
+      pair: "B U2 B'",
+      hint: 'B로 뒤쪽 엣지를 잠시 내립니다. U2로 코너를 뒤·왼쪽 위로 옮긴 뒤 B′로 엣지를 올려 붙입니다.',
     },
     {
       whiteFace: 'U',
-      edge: 'UB',
-      top: 'red',
-      route: 'right',
-      pair: "U R U2 R'",
-      align: '',
-      hint: 'U로 엣지의 G를 오른쪽 G 센터에 맞춥니다. R로 엣지를 내리고 U2로 코너를 옮긴 뒤 R′로 붙입니다.',
-    },
-    {
-      whiteFace: 'U',
-      edge: 'UB',
       top: 'green',
-      route: 'left',
-      pair: "U2 F' U' F",
-      align: '',
-      hint: 'U2로 엣지의 R을 앞쪽 R 센터에 맞춥니다. F′로 엣지를 내리고 U′로 코너를 옮긴 뒤 F로 붙입니다.',
-    },
-    {
-      whiteFace: 'U',
-      edge: 'UL',
-      top: 'green',
-      route: 'left',
-      pair: "U' F' U2 F",
-      align: '',
-      hint: 'U′로 엣지의 R을 앞쪽 R 센터에 맞춥니다. F′로 엣지를 내리고 U2로 코너를 옮긴 뒤 F로 붙입니다.',
+      setup: "Y L' U' L U Y' F' U F U' U'",
+      pair: "B' U' B",
+      hint: 'B′로 뒤쪽 엣지를 잠시 내립니다. U′로 코너를 뒤·오른쪽 위로 옮긴 뒤 B로 엣지를 올려 붙입니다.',
     },
   ],
 };
@@ -237,20 +162,6 @@ export function isPairFormed(cube: Cube): boolean {
   );
 }
 
-export function isTargetInserted(cube: Cube): boolean {
-  return cube
-    .filter((s) => TARGET_IDS.includes(s.id))
-    .every(
-      (s) =>
-        s.position[1] < 1 &&
-        s.color ===
-          centerColor(
-            cube,
-            FACES.find((f) => equal(s.normal, NORMALS[f]))!,
-          ),
-    );
-}
-
 export type Exercise = {
   id: LessonId;
   variant: number;
@@ -259,7 +170,7 @@ export type Exercise = {
   initial: Cube;
   setup: Move[];
   stages: {
-    id: StageId;
+    id: 'pair';
     title: string;
     algorithm: string;
     hint: string;
@@ -269,64 +180,11 @@ export type Exercise = {
   solution: Move[];
   checkpoints: Cube[];
 };
-
 function buildExercise(id: LessonId, variant: number): Exercise {
   const definition = VARIANTS[id][variant];
-  const left = definition.route === 'left';
-  const sections = definition.direct
-    ? [
-        {
-          id: 'insert' as const,
-          title: '정답 · 페어링과 삽입을 한 번에',
-          algorithm: definition.pair,
-          hint: definition.hint,
-        },
-      ]
-    : [
-        {
-          id: 'pair' as const,
-          title: '페어 만들기',
-          algorithm: definition.pair,
-          hint: definition.hint,
-        },
-        {
-          id: 'align' as const,
-          title: '삽입 위치 맞추기',
-          algorithm: [definition.align, left ? 'Y' : '']
-            .filter(Boolean)
-            .join(' '),
-          hint: left
-            ? '페어를 슬롯 위에 맞춘 뒤 →로 큐브 전체를 돌립니다. 이제 G가 앞, R이 왼쪽이므로 같은 R·G 슬롯에 왼손 공식으로 넣습니다.'
-            : definition.align
-              ? 'U층만 돌려 붙어 있는 페어를 R·G 슬롯 바로 위에 놓습니다. 두 조각을 계속 함께 움직이세요.'
-              : '이미 페어가 R·G 슬롯 위에 있습니다. 추가 정렬 없이 오른손 삽입으로 이어갑니다.',
-        },
-        {
-          id: 'insert' as const,
-          title: left ? '왼쪽 앞으로 넣기' : '오른쪽 앞으로 넣기',
-          algorithm: left ? "U' L' U L" : "U R U' R'",
-          hint: '페어를 잠깐 비키고 슬롯을 연 뒤, 페어를 가져와 닫습니다. 네 수를 모두 연습합니다.',
-        },
-      ];
-  const solution: Move[] = [];
-  const stages = sections.map((section) => {
-    const start = solution.length;
-    solution.push(...moves(section.algorithm));
-    return {
-      ...section,
-      algorithm: section.algorithm.replace('Y', '→'),
-      start,
-      end: solution.length,
-    };
-  });
-  // Start from a solved cube in the final viewing orientation and reverse the
-  // complete lesson. Every exercise is reachable using legal outer-face turns.
-  const final = left ? applyMove(solved, { face: 'Y', turns: 1 }) : solved;
-  const setup: Move[] = [
-    ...(left ? [{ face: 'Y', turns: 1 } as Move] : []),
-    ...solution.slice().reverse().map(inverse),
-  ];
-  const initial = applyMoves(final, solution.slice().reverse().map(inverse));
+  const setup = moves(definition.setup);
+  const initial = applyMoves(solvedCube(), setup);
+  const solution = moves(definition.pair);
   const checkpoints: Cube[] = [initial];
   for (const move of solution)
     checkpoints.push(applyMove(checkpoints.at(-1)!, move));
@@ -337,12 +195,20 @@ function buildExercise(id: LessonId, variant: number): Exercise {
     definition,
     initial,
     setup,
-    stages,
     solution,
     checkpoints,
+    stages: [
+      {
+        id: 'pair',
+        title: 'Y층에서 페어 만들기',
+        algorithm: definition.pair,
+        hint: definition.hint,
+        start: 0,
+        end: solution.length,
+      },
+    ],
   };
 }
-
 export const EXERCISES = LESSONS.flatMap((lesson) =>
   VARIANTS[lesson.id].map((_, index) => buildExercise(lesson.id, index)),
 );
@@ -383,8 +249,8 @@ export function guideCursor(
 
 export function trainingStatus(
   cube: Cube,
-): 'inserted' | 'paired' | 'cross-broken' | 'working' {
-  if (!hasWhiteCross(cube)) return 'cross-broken';
-  if (isTargetInserted(cube)) return 'inserted';
-  return isPairFormed(cube) ? 'paired' : 'working';
+): 'paired' | 'pair-cross-broken' | 'cross-broken' | 'working' {
+  if (isPairFormed(cube))
+    return hasWhiteCross(cube) ? 'paired' : 'pair-cross-broken';
+  return hasWhiteCross(cube) ? 'working' : 'cross-broken';
 }

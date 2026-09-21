@@ -9,7 +9,7 @@ import {
   rotation,
 } from '../../domain/cube/cube';
 import type { Cube, Face, Move, Vec3 } from '../../domain/cube/cube';
-import { COLOR_LETTERS, CORNER_IDS } from '../../domain/f2l/lessons';
+import { COLOR_LETTERS } from '../../domain/f2l/lessons';
 
 type Props = {
   cube: Cube;
@@ -111,9 +111,7 @@ export function CubeView({
                 : COLORS[sticker.color]
               : '#25352f',
             depth: dot(transform(middle, position), viewCamera),
-            label: highlighted
-              ? `${CORNER_IDS.includes(sticker.id) ? 'C' : 'E'}·${COLOR_LETTERS[sticker.color]}`
-              : '',
+            label: highlighted ? COLOR_LETTERS[sticker.color] : '',
             labelPosition: project(transform(middle, position)),
             light: sticker?.color === 'white' || sticker?.color === 'yellow',
           });
@@ -177,27 +175,6 @@ export function CubeView({
           )}
         </g>
       ))}
-      {!move &&
-        visible.map((face) => {
-          const [x, y] = project(scale(NORMALS[face], 1.501));
-          return (
-            <text
-              key={face}
-              x={x}
-              y={y + 1}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill={['U', 'D', 'B'].includes(face) ? '#3b382b' : '#fff'}
-              fontSize="19"
-              fontWeight="800"
-              stroke="#26352f"
-              strokeWidth="0.4"
-              paintOrder="stroke"
-            >
-              {face}
-            </text>
-          );
-        })}
     </svg>
   );
 }

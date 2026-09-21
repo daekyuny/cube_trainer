@@ -29,17 +29,17 @@ export function LessonPanel({
   const busy = session.queue.length > 0;
   const status = trainingStatus(session.cube);
   const next =
-    cursor === null || status === 'inserted'
+    cursor === null || status === 'paired'
       ? undefined
       : exercise.solution[cursor];
   const statusText =
-    status === 'inserted'
-      ? '삽입 완료 · W 십자가도 유지했습니다.'
-      : status === 'paired'
-        ? '페어 완성 · 이제 위치를 맞추고 넣어 보세요.'
+    status === 'paired'
+      ? '페어 완성 · Y층에서 멈춥니다. W 십자가도 유지했습니다.'
+      : status === 'pair-cross-broken'
+        ? '두 조각은 붙었습니다. W 십자가를 복원하면 이번 연습이 끝납니다.'
         : status === 'cross-broken'
-          ? 'W 십자가가 변형된 상태입니다. 면을 되돌리면 복원되는지 확인하세요.'
-          : 'C 코너와 E 엣지를 같은 색끼리 붙여 보세요.';
+          ? '페어링 중 · 열어 둔 면을 되돌려 W 십자가를 복원하세요.'
+          : 'R·G·W 코너와 R·G 엣지를 Y층에서 붙여 보세요.';
 
   return (
     <section className="lesson-panel" aria-label="F2L 페어링 훈련">
@@ -50,7 +50,7 @@ export function LessonPanel({
       <p className="lesson-premise">
         W 십자가와 O·B·R·G 센터 정렬은 완료.
         <br />
-        조각 꺼내기와 분리는 끝낸 상태에서 시작합니다.
+        코너는 앞·오른쪽 위, 엣지는 O면 쪽 뒤·위에 고정합니다.
       </p>
       <div className="lesson-picker" aria-label="다섯 가지 페어링 유형">
         {LESSONS.map((item) => (
@@ -71,17 +71,17 @@ export function LessonPanel({
         {showGuide && <p>{definition.explanation}</p>}
         <dl>
           <div>
-            <dt>시작 코너 C</dt>
+            <dt>시작 코너</dt>
             <dd>
               W·R·G / R·G 슬롯 바로 위 · W는{' '}
               {{ R: '오른쪽', F: '앞', U: '위' }[exercise.definition.whiteFace]}
             </dd>
           </div>
           <div>
-            <dt>시작 엣지 E</dt>
+            <dt>시작 엣지</dt>
             <dd>
-              R·G / Y층 {exercise.definition.edge === 'UL' ? '왼쪽' : '뒤쪽'} ·
-              위는 {COLOR_LETTERS[exercise.definition.top]}
+              R·G / Y층 뒤쪽 · O 센터 위 · 위는{' '}
+              {COLOR_LETTERS[exercise.definition.top]}
             </dd>
           </div>
         </dl>
@@ -91,7 +91,7 @@ export function LessonPanel({
             checked={focus}
             onChange={(event) => onFocusChange(event.target.checked)}
           />{' '}
-          대상 조각 강조 · C 코너 / E 엣지
+          대상 조각 강조
         </label>
         <details className="lesson-detail">
           <summary>색 문자와 시작 조건</summary>
@@ -103,25 +103,25 @@ export function LessonPanel({
           <p>
             다섯 유형 모두 W·R·G 코너는 Y층 앞·오른쪽, 자기 슬롯 바로 위입니다.
             W가 어느 면을 보는지만 달라집니다. R·G 엣지는 코너와 붙지 않은 Y층
-            왼쪽 또는 뒤쪽입니다.
+            뒤쪽 O 센터 위입니다.
           </p>
           <p>
-            먼저 이 대표 배치로 원리를 익히세요. 윗색의 같음·다름과 W 방향에
-            대한 엣지의 위치를 함께 구분합니다. 전체 수평 회전이나 좌우 대칭은
-            별도 유형으로 세지 않습니다.
+            목표는 Y층 페어링까지입니다. 슬롯 정렬과 삽입은 다음에 연습합니다.
           </p>
-          <button
-            className="secondary-button"
-            onClick={() =>
-              dispatch({
-                type: 'lesson',
-                id: lesson.id,
-                variant: (lesson.variant + 1) % exercise.variantCount,
-              })
-            }
-          >
-            같은 유형의 다른 배치 ({lesson.variant + 1}/{exercise.variantCount})
-          </button>
+          {lesson.id === 5 && (
+            <button
+              className="secondary-button"
+              onClick={() =>
+                dispatch({
+                  type: 'lesson',
+                  id: 5,
+                  variant: (lesson.variant + 1) % exercise.variantCount,
+                })
+              }
+            >
+              엣지 윗색 바꾸기 · 현재 {COLOR_LETTERS[exercise.definition.top]}
+            </button>
+          )}
         </details>
       </div>
       <div className="lesson-mode" aria-label="훈련 안내">
@@ -159,41 +159,21 @@ export function LessonPanel({
                     {stage.title}
                   </h4>
                   <p>{stage.hint}</p>
-                  <code>
-                    {exercise.definition.direct &&
-                    exercise.definition.route === 'right'
-                      ? `W 오른쪽: ${stage.algorithm}`
-                      : stage.algorithm || '추가 회전 없음'}
-                  </code>
-                  {exercise.definition.direct && (
-                    <>
-                      <code>W 왼쪽: L′ U′ L</code>
-                      <p className="mirror-answer">
-                        {exercise.definition.route === 'right' ? (
-                          <>
-                            현재 그림은 오른쪽 배치입니다. 왼쪽 공식은 코너가
-                            자기 앞·왼쪽 슬롯 위, 엣지가 뒤쪽에 있는 좌우 대칭
-                            배치에 적용합니다. 앞색은 앞 센터와 맞춥니다.
-                          </>
-                        ) : (
-                          <>
-                            W 오른쪽 정답은 R U R′입니다. 현재 그림은 →로 전체를
-                            돌리면 W 왼쪽 배치가 됩니다. 시연은 → L′ U′ L을
-                            사용합니다. 전체를 돌리지 않을 때는 F′ U′ F로 같은
-                            슬롯을 완성합니다.
-                          </>
-                        )}
-                      </p>
-                    </>
-                  )}
+                  <code>{stage.algorithm}</code>
+                  <p className="notation-note">
+                    {stage.algorithm.split(' ').length}수 · 180° 회전도 한 수로
+                    셉니다.
+                  </p>
                 </li>
               );
             })}
           </ol>
           <p className="notation-note">
-            ′는 반시계, U2는 U 두 번. →는 큐브 전체 오른쪽 90° 회전입니다.
+            수순의 R은 오른쪽, F는 앞, L은 왼쪽, B는 뒤, U는 윗면입니다. ′는
+            반시계, U2는 윗면 180° 회전입니다. 큐브에 적힌 문자는 색을
+            나타냅니다.
           </p>
-          {cursor === null && status !== 'inserted' && (
+          {cursor === null && status !== 'paired' && (
             <p className="guide-notice">
               예시 수순과 다른 경로입니다. 직접 계속 풀어도 완성을 판정합니다.
               시연을 다시 보려면 한 수 되돌리기 또는 같은 배치 다시를 눌러
@@ -208,8 +188,8 @@ export function LessonPanel({
             >
               {next
                 ? `다음 한 수 · ${notation(next)}`
-                : status === 'inserted' && cursor === null
-                  ? '삽입 완료'
+                : status === 'paired'
+                  ? '페어링 완료'
                   : cursor === null
                     ? '예시 수순에서 벗어남'
                     : '예시 수순 완료'}
@@ -241,9 +221,9 @@ export function LessonPanel({
         </button>
       </div>
       <p className="lesson-footnote">
-        {exercise.definition.direct
-          ? '이 대표 배치는 면 회전 세 수로 페어링과 삽입이 끝납니다. 추가 삽입 공식이 필요하지 않습니다.'
-          : '페어링 후 정렬과 삽입을 익히는 연습입니다. 준비된 배치에 맞는 수순을 사용하세요.'}
+        W 십자가를 복원하며 Y층에 페어를 만드는 최소 수순입니다. 첫 페어
+        연습이므로 다른 슬롯의 보존은 다루지 않습니다. 페어를 슬롯에 넣는 단계는
+        포함하지 않습니다.
       </p>
     </section>
   );
