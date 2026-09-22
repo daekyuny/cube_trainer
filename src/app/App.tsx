@@ -119,10 +119,12 @@ export function App() {
   const pairStatus = session.lesson ? trainingStatus(session.cube) : null;
   const stageStatus =
     pairStatus === 'paired'
-      ? '페어 완성 · W 십자 유지'
+      ? '페어 완성 · 십자·세 슬롯 유지'
       : pairStatus === 'pair-cross-broken'
         ? '페어 연결 · W 십자 복원 중'
-        : cubeStatus;
+        : pairStatus === 'slots-disturbed'
+          ? '다른 세 슬롯 복원 필요'
+          : cubeStatus;
   const facesLegend = (faces: Face[]) =>
     faces.map((face) => (
       <span key={face}>

@@ -2,6 +2,9 @@ import {
   applyMove,
   applyMoves,
   equal,
+  centerColor,
+  FACES,
+  NORMALS,
   hasWhiteCross,
   solvedCube,
 } from '../cube/cube.ts';
@@ -27,25 +30,25 @@ export const LESSONS: { id: LessonId; title: string; explanation: string }[] = [
     id: 2,
     title: 'W 오른쪽 · 윗색 같음',
     explanation:
-      '코너의 W는 G 센터 쪽을 보고, 두 조각의 윗색은 모두 G입니다. 코너를 숨기고 엣지를 앞으로 가져옵니다.',
+      '코너의 W는 G 센터 쪽을 보고, 두 조각의 윗색은 모두 G입니다. 코너를 앞·왼쪽으로 옮겨 숨긴 뒤 엣지를 만나게 합니다.',
   },
   {
     id: 3,
     title: 'W 앞 · 윗색 다름',
     explanation:
-      '코너의 W는 R 센터 쪽을 보고, 두 조각의 윗색은 R과 G로 다릅니다. 뒤쪽 엣지를 그대로 두고 코너를 왼쪽으로 돌아 만나게 합니다.',
+      '코너의 W는 R 센터 쪽을 보고, 두 조각의 윗색은 R과 G로 다릅니다. 윗면으로 두 조각을 옮긴 뒤 오른쪽·앞면을 열고 복원하며 붙입니다.',
   },
   {
     id: 4,
     title: 'W 앞 · 윗색 같음',
     explanation:
-      '코너의 W는 R 센터 쪽을 보고, 두 조각의 윗색은 모두 R입니다. 앞면으로 코너를 숨기고 엣지를 오른쪽으로 가져옵니다.',
+      '코너의 W는 R 센터 쪽을 보고, 두 조각의 윗색은 모두 R입니다. 코너를 뒤·오른쪽으로 옮겨 숨긴 뒤 엣지를 만나게 합니다.',
   },
   {
     id: 5,
     title: 'W 위',
     explanation:
-      '코너의 W는 Y 센터 쪽을 봅니다. 뒤쪽 엣지를 내리고 코너를 옮긴 뒤 다시 올려 붙입니다. 엣지의 윗색 R/G에 따라 수순이 달라집니다.',
+      '코너의 W는 Y 센터 쪽을 봅니다. 엣지를 앞 또는 오른쪽으로 옮겨 내리고, 코너를 옮긴 뒤 다시 올려 붙입니다. 엣지의 윗색 R/G에 따라 수순이 달라집니다.',
   },
 ];
 type Variant = {
@@ -72,8 +75,8 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       whiteFace: 'R',
       top: 'green',
       setup: "Y L' U' L U Y' U F' U' U' F U'",
-      pair: "R' U2 R",
-      hint: 'R′로 코너를 아래에 숨깁니다. U2로 뒤쪽 엣지를 앞으로 옮긴 뒤 R로 코너를 올려 엣지와 붙입니다.',
+      pair: "U F' U2 F",
+      hint: 'U로 코너를 앞·왼쪽에 옮기고 F′로 아래에 숨깁니다. U2로 엣지를 왼쪽으로 옮긴 뒤 F로 코너를 올려 붙입니다. 다른 세 슬롯도 복원됩니다.',
     },
   ],
   3: [
@@ -81,8 +84,8 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       whiteFace: 'F',
       top: 'green',
       setup: "Y L' U' L U Y' R U R' F' U F",
-      pair: "F' L F L'",
-      hint: 'F′로 코너를 왼쪽 위로 보냅니다. L로 아래에 내리고 F로 앞면을 복원한 뒤 L′로 코너를 뒤쪽 위에 올려 엣지와 붙입니다. 엣지는 뒤쪽 위에 그대로 있습니다.',
+      pair: "U' R' F R F'",
+      hint: 'U′로 코너를 뒤·오른쪽, 엣지를 왼쪽으로 옮깁니다. R′ F로 코너를 아래에 내리고 R F′로 올려 엣지와 붙입니다. 열었던 면을 복원해 다른 세 슬롯도 유지합니다.',
     },
   ],
   4: [
@@ -90,8 +93,8 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       whiteFace: 'F',
       top: 'red',
       setup: "R U R' U' U' R U' R' U",
-      pair: "F U F'",
-      hint: 'F로 코너를 아래에 숨깁니다. U로 뒤쪽 엣지를 오른쪽으로 옮긴 뒤 F′로 코너를 올려 엣지와 붙입니다.',
+      pair: "U' R U R'",
+      hint: 'U′로 코너를 뒤·오른쪽에 옮기고 R로 아래에 숨깁니다. U로 엣지를 뒤쪽으로 옮긴 뒤 R′로 코너를 올려 붙입니다. 다른 세 슬롯도 복원됩니다.',
     },
   ],
   5: [
@@ -99,15 +102,15 @@ const VARIANTS: Record<LessonId, Variant[]> = {
       whiteFace: 'U',
       top: 'red',
       setup: "R U R' U' R U' U' R' U'",
-      pair: "B U2 B'",
-      hint: 'B로 뒤쪽 엣지를 잠시 내립니다. U2로 코너를 뒤·왼쪽 위로 옮긴 뒤 B′로 엣지를 올려 붙입니다.',
+      pair: "U R U2 R'",
+      hint: 'U로 엣지를 오른쪽에 옮기고 R로 내립니다. U2로 코너를 뒤·오른쪽에 옮긴 뒤 R′로 엣지를 올려 붙입니다. 다른 세 슬롯도 복원됩니다.',
     },
     {
       whiteFace: 'U',
       top: 'green',
       setup: "Y L' U' L U Y' F' U F U' U'",
-      pair: "B' U' B",
-      hint: 'B′로 뒤쪽 엣지를 잠시 내립니다. U′로 코너를 뒤·오른쪽 위로 옮긴 뒤 B로 엣지를 올려 붙입니다.',
+      pair: "U2 F' U' F",
+      hint: 'U2로 엣지를 앞으로 옮기고 F′로 내립니다. U′로 코너를 앞·왼쪽에 옮긴 뒤 F로 엣지를 올려 붙입니다. 다른 세 슬롯도 복원됩니다.',
     },
   ],
 };
@@ -160,6 +163,26 @@ export function isPairFormed(cube: Cube): boolean {
       ),
     )
   );
+}
+
+// Three non-target F2L slots: every sticker of their corners and edges.
+const OTHER_SLOT_IDS = solved
+  .filter(
+    (s) =>
+      s.position[1] <= 0 &&
+      Math.abs(s.position[0]) === 1 &&
+      Math.abs(s.position[2]) === 1 &&
+      !TARGET_IDS.includes(s.id),
+  )
+  .map((s) => s.id);
+
+export function areOtherSlotsSolved(cube: Cube): boolean {
+  return cube
+    .filter((s) => OTHER_SLOT_IDS.includes(s.id))
+    .every((s) => {
+      const face = FACES.find((f) => equal(s.normal, NORMALS[f]))!;
+      return s.position[1] < 1 && s.color === centerColor(cube, face);
+    });
 }
 
 export type Exercise = {
@@ -249,8 +272,15 @@ export function guideCursor(
 
 export function trainingStatus(
   cube: Cube,
-): 'paired' | 'pair-cross-broken' | 'cross-broken' | 'working' {
-  if (isPairFormed(cube))
-    return hasWhiteCross(cube) ? 'paired' : 'pair-cross-broken';
-  return hasWhiteCross(cube) ? 'working' : 'cross-broken';
+):
+  | 'paired'
+  | 'pair-cross-broken'
+  | 'cross-broken'
+  | 'slots-disturbed'
+  | 'working' {
+  const paired = isPairFormed(cube);
+  if (!hasWhiteCross(cube))
+    return paired ? 'pair-cross-broken' : 'cross-broken';
+  if (!areOtherSlotsSolved(cube)) return 'slots-disturbed';
+  return paired ? 'paired' : 'working';
 }

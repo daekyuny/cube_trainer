@@ -34,12 +34,14 @@ export function LessonPanel({
       : exercise.solution[cursor];
   const statusText =
     status === 'paired'
-      ? '페어 완성 · Y층에서 멈춥니다. W 십자가도 유지했습니다.'
+      ? '페어 완성 · Y층에서 멈춥니다. W 십자가와 다른 세 슬롯도 유지했습니다.'
       : status === 'pair-cross-broken'
-        ? '두 조각은 붙었습니다. W 십자가를 복원하면 이번 연습이 끝납니다.'
+        ? '두 조각은 붙었습니다. W 십자가와 다른 세 슬롯을 복원하면 완료입니다.'
         : status === 'cross-broken'
           ? '페어링 중 · 열어 둔 면을 되돌려 W 십자가를 복원하세요.'
-          : 'R·G·W 코너와 R·G 엣지를 Y층에서 붙여 보세요.';
+          : status === 'slots-disturbed'
+            ? '다른 코너·엣지가 흐트러져 있습니다. 다른 세 슬롯까지 복원해야 완료입니다.'
+            : 'R·G·W 코너와 R·G 엣지를 Y층에서 붙여 보세요.';
 
   return (
     <section className="lesson-panel" aria-label="F2L 페어링 훈련">
@@ -48,7 +50,7 @@ export function LessonPanel({
         <span>5 TYPES</span>
       </div>
       <p className="lesson-premise">
-        W 십자가와 O·B·R·G 센터 정렬은 완료.
+        W 십자가와 다른 세 슬롯은 맞춰진 상태입니다.
         <br />
         코너는 앞·오른쪽 위, 엣지는 O면 쪽 뒤·위에 고정합니다.
       </p>
@@ -221,9 +223,9 @@ export function LessonPanel({
         </button>
       </div>
       <p className="lesson-footnote">
-        W 십자가를 복원하며 Y층에 페어를 만드는 최소 수순입니다. 첫 페어
-        연습이므로 다른 슬롯의 보존은 다루지 않습니다. 페어를 슬롯에 넣는 단계는
-        포함하지 않습니다.
+        W 십자가와 다른 세 슬롯의 코너·엣지를 모두 보존하며 Y층에 페어를 만드는
+        최소 수순입니다. 회전 중 잠시 움직인 조각도 수순 완료 시 제자리·방향으로
+        복원됩니다. 페어 삽입은 다음 단계입니다.
       </p>
     </section>
   );

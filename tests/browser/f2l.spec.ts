@@ -124,7 +124,7 @@ test('F2L-02/08: only case 5 changes edge orientation; both views show color lab
   await expect(page.locator('.lesson-observation')).toContainText(
     'Y층 뒤쪽 · O 센터 위 · 위는 G',
   );
-  await expect(page.getByTestId('stage-pair')).toContainText("B' U' B");
+  await expect(page.getByTestId('stage-pair')).toContainText("U2 F' U' F");
   await page.getByRole('button', { name: '이 단계 시연' }).click();
   await expect(page.getByTestId('lesson-status')).toHaveAttribute(
     'data-status',
@@ -135,6 +135,37 @@ test('F2L-02/08: only case 5 changes edge orientation; both views show color lab
   await expect(page.locator('.cube-svg text')).toHaveCount(0);
   await page.getByRole('button', { name: '자유 연습', exact: true }).click();
   await expect(page.locator('.cube-svg text')).toHaveCount(0);
+});
+
+test('F2L-09: a pair that breaks another slot is not accepted; corrected demonstration preserves it', async ({
+  page,
+}) => {
+  await page.locator('.lesson-picker button').nth(1).click();
+  for (const key of ['Shift+r', 'u', 'u', 'r']) await page.keyboard.press(key);
+  await expect(page.getByTestId('cube-stage')).toHaveAttribute(
+    'data-busy',
+    'false',
+  );
+  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
+    'data-status',
+    'slots-disturbed',
+  );
+  await expect(page.getByTestId('lesson-status')).toContainText(
+    '다른 세 슬롯까지 복원',
+  );
+  await expect(
+    page.getByRole('button', { name: '페어링 완료', exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: '같은 배치 다시' }).click();
+  await expect(page.getByTestId('stage-pair')).toContainText("U F' U2 F");
+  await page.getByRole('button', { name: '이 단계 시연' }).click();
+  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
+    'data-status',
+    'paired',
+  );
+  await expect(page.getByTestId('lesson-status')).toContainText(
+    '다른 세 슬롯도 유지',
+  );
 });
 
 test('SESSION-03/04: reset and restart cancel animation, and switching modes cancels demonstration', async ({
