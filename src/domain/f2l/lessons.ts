@@ -10,6 +10,7 @@ import {
 } from '../cube/cube.ts';
 import type { Color, Cube, Move, Sticker } from '../cube/cube.ts';
 
+export type LessonSide = 'right' | 'left';
 export type LessonId = 1 | 2 | 3 | 4 | 5;
 export const COLOR_LETTERS: Record<Color, string> = {
   white: 'W',
@@ -52,8 +53,8 @@ export const LESSONS: { id: LessonId; title: string; explanation: string }[] = [
   },
 ];
 type Variant = {
-  whiteFace: 'R' | 'F' | 'U';
-  top: 'red' | 'green';
+  whiteFace: 'R' | 'L' | 'F' | 'U';
+  top: 'red' | 'green' | 'blue';
   setup: string;
   pair: string;
   hint: string;
@@ -115,6 +116,37 @@ const VARIANTS: Record<LessonId, Variant[]> = {
   ],
 };
 
+// Reflection across the left/right plane swaps R/L and reverses each turn.
+function mirrorAlgorithm(algorithm: string): string {
+  return algorithm
+    .split(' ')
+    .map((token) => {
+      const face = token[0] === 'R' ? 'L' : token[0] === 'L' ? 'R' : token[0];
+      return (
+        face + (token.endsWith('2') ? '2' : token.endsWith("'") ? '' : "'")
+      );
+    })
+    .join(' ');
+}
+const LEFT_HINTS: Record<LessonId, string[]> = {
+  1: [
+    'L′에서 두 조각이 Y층에서 붙습니다. U로 페어를 왼쪽 면에서 비킨 뒤 L로 십자가와 다른 세 슬롯을 복원합니다.',
+  ],
+  2: [
+    'U′로 코너를 앞·오른쪽에 옮기고 F로 아래에 숨깁니다. U2로 엣지를 오른쪽으로 옮긴 뒤 F′로 코너를 올려 붙입니다.',
+  ],
+  3: [
+    'U로 코너를 뒤·왼쪽, 엣지를 오른쪽으로 옮깁니다. L F′로 코너를 내리고 L′ F로 올려 엣지와 붙이며 열었던 면을 복원합니다.',
+  ],
+  4: [
+    'U로 코너를 뒤·왼쪽에 옮기고 L′로 아래에 숨깁니다. U′로 엣지를 뒤로 옮긴 뒤 L로 코너를 올려 붙입니다.',
+  ],
+  5: [
+    'U′로 엣지를 왼쪽에 옮기고 L′로 내립니다. U2로 코너를 뒤·왼쪽에 옮긴 뒤 L로 엣지를 올려 붙입니다.',
+    'U2로 엣지를 앞으로 옮기고 F로 내립니다. U로 코너를 앞·오른쪽에 옮긴 뒤 F′로 엣지를 올려 붙입니다.',
+  ],
+};
+
 // Quarter-turn checkpoints let two keyboard U presses follow an indicated U2.
 function moves(text: string): Move[] {
   return text
@@ -137,18 +169,35 @@ export const EDGE_IDS = solved
   .filter((s) => equal(s.position, [1, 0, 1]))
   .map((s) => s.id);
 export const TARGET_IDS = [...CORNER_IDS, ...EDGE_IDS];
-export function targetPieces(cube: Cube): {
+const LEFT_CORNER_IDS = solved
+  .filter((s) => equal(s.position, [-1, -1, 1]))
+  .map((s) => s.id);
+const LEFT_EDGE_IDS = solved
+  .filter((s) => equal(s.position, [-1, 0, 1]))
+  .map((s) => s.id);
+const LEFT_TARGET_IDS = [...LEFT_CORNER_IDS, ...LEFT_EDGE_IDS];
+export function targetIds(side: LessonSide = 'right'): string[] {
+  return side === 'left' ? LEFT_TARGET_IDS : TARGET_IDS;
+}
+export function targetPieces(
+  cube: Cube,
+  side: LessonSide = 'right',
+): {
   corner: Sticker[];
   edge: Sticker[];
 } {
   return {
-    corner: cube.filter((s) => CORNER_IDS.includes(s.id)),
-    edge: cube.filter((s) => EDGE_IDS.includes(s.id)),
+    corner: cube.filter((s) =>
+      (side === 'left' ? LEFT_CORNER_IDS : CORNER_IDS).includes(s.id),
+    ),
+    edge: cube.filter((s) =>
+      (side === 'left' ? LEFT_EDGE_IDS : EDGE_IDS).includes(s.id),
+    ),
   };
 }
 
-export function isPairFormed(cube: Cube): boolean {
-  const { corner, edge } = targetPieces(cube);
+export function isPairFormed(cube: Cube, side: LessonSide = 'right'): boolean {
+  const { corner, edge } = targetPieces(cube, side);
   return (
     corner[0].position[1] === 1 &&
     edge[0].position[1] === 1 &&
@@ -156,7 +205,7 @@ export function isPairFormed(cube: Cube): boolean {
       (sum, v, i) => sum + Math.abs(v - edge[0].position[i]),
       0,
     ) === 1 &&
-    (['red', 'green'] as const).every((color) =>
+    (['red', side === 'left' ? 'blue' : 'green'] as const).every((color) =>
       equal(
         corner.find((s) => s.color === color)!.normal,
         edge.find((s) => s.color === color)!.normal,
@@ -166,19 +215,24 @@ export function isPairFormed(cube: Cube): boolean {
 }
 
 // Three non-target F2L slots: every sticker of their corners and edges.
-const OTHER_SLOT_IDS = solved
-  .filter(
-    (s) =>
-      s.position[1] <= 0 &&
-      Math.abs(s.position[0]) === 1 &&
-      Math.abs(s.position[2]) === 1 &&
-      !TARGET_IDS.includes(s.id),
-  )
-  .map((s) => s.id);
+const OTHER_SLOT_IDS = (['right', 'left'] as const).map((side) =>
+  solved
+    .filter(
+      (s) =>
+        s.position[1] <= 0 &&
+        Math.abs(s.position[0]) === 1 &&
+        Math.abs(s.position[2]) === 1 &&
+        !targetIds(side).includes(s.id),
+    )
+    .map((s) => s.id),
+);
 
-export function areOtherSlotsSolved(cube: Cube): boolean {
+export function areOtherSlotsSolved(
+  cube: Cube,
+  side: LessonSide = 'right',
+): boolean {
   return cube
-    .filter((s) => OTHER_SLOT_IDS.includes(s.id))
+    .filter((s) => OTHER_SLOT_IDS[side === 'left' ? 1 : 0].includes(s.id))
     .every((s) => {
       const face = FACES.find((f) => equal(s.normal, NORMALS[f]))!;
       return s.position[1] < 1 && s.color === centerColor(cube, face);
@@ -186,6 +240,8 @@ export function areOtherSlotsSolved(cube: Cube): boolean {
 }
 
 export type Exercise = {
+  side: LessonSide;
+  tokens: { label: string; start: number; end: number }[];
   id: LessonId;
   variant: number;
   variantCount: number;
@@ -203,15 +259,38 @@ export type Exercise = {
   solution: Move[];
   checkpoints: Cube[];
 };
-function buildExercise(id: LessonId, variant: number): Exercise {
-  const definition = VARIANTS[id][variant];
+function buildExercise(
+  id: LessonId,
+  variant: number,
+  side: LessonSide = 'right',
+): Exercise {
+  const original = VARIANTS[id][variant];
+  const definition: Variant =
+    side === 'right'
+      ? original
+      : {
+          ...original,
+          whiteFace: original.whiteFace === 'R' ? 'L' : original.whiteFace,
+          top: original.top === 'green' ? 'blue' : original.top,
+          setup: mirrorAlgorithm(original.setup),
+          pair: mirrorAlgorithm(original.pair),
+          hint: LEFT_HINTS[id][variant],
+        };
   const setup = moves(definition.setup);
   const initial = applyMoves(solvedCube(), setup);
   const solution = moves(definition.pair);
   const checkpoints: Cube[] = [initial];
   for (const move of solution)
     checkpoints.push(applyMove(checkpoints.at(-1)!, move));
+  let offset = 0;
+  const tokens = definition.pair.split(' ').map((label) => {
+    const start = offset;
+    offset += label.endsWith('2') ? 2 : 1;
+    return { label, start, end: offset };
+  });
   return {
+    side,
+    tokens,
     id,
     variant,
     variantCount: VARIANTS[id].length,
@@ -235,8 +314,17 @@ function buildExercise(id: LessonId, variant: number): Exercise {
 export const EXERCISES = LESSONS.flatMap((lesson) =>
   VARIANTS[lesson.id].map((_, index) => buildExercise(lesson.id, index)),
 );
-export function getExercise(id: LessonId, variant = 0): Exercise {
-  return EXERCISES.find(
+export const MIRRORED_EXERCISES = LESSONS.flatMap((lesson) =>
+  VARIANTS[lesson.id].map((_, index) =>
+    buildExercise(lesson.id, index, 'left'),
+  ),
+);
+export function getExercise(
+  id: LessonId,
+  variant = 0,
+  side: LessonSide = 'right',
+): Exercise {
+  return (side === 'left' ? MIRRORED_EXERCISES : EXERCISES).find(
     (exercise) => exercise.id === id && exercise.variant === variant,
   )!;
 }
@@ -272,15 +360,16 @@ export function guideCursor(
 
 export function trainingStatus(
   cube: Cube,
+  side: LessonSide = 'right',
 ):
   | 'paired'
   | 'pair-cross-broken'
   | 'cross-broken'
   | 'slots-disturbed'
   | 'working' {
-  const paired = isPairFormed(cube);
+  const paired = isPairFormed(cube, side);
   if (!hasWhiteCross(cube))
     return paired ? 'pair-cross-broken' : 'cross-broken';
-  if (!areOtherSlotsSolved(cube)) return 'slots-disturbed';
+  if (!areOtherSlotsSolved(cube, side)) return 'slots-disturbed';
   return paired ? 'paired' : 'working';
 }

@@ -15,6 +15,8 @@ import {
 import type { Cube, Move } from '../src/domain/cube/cube.ts';
 import {
   EXERCISES,
+  MIRRORED_EXERCISES,
+  targetIds,
   TARGET_IDS,
   areOtherSlotsSolved,
   getExercise,
@@ -244,4 +246,72 @@ test('F2L-09: reject the former answers that pair on Y and restore the cross but
     3,
     'regression exercises damage each of the three protected corners',
   );
+});
+
+test('F2L-10: mirrored RB starts and solutions preserve every other lower sticker', () => {
+  assert.deepEqual(
+    MIRRORED_EXERCISES.map((e) => e.definition.pair),
+    [
+      "L' U L",
+      "U' F U2 F'",
+      "U L F' L' F",
+      "U L' U' L",
+      "U' L' U2 L",
+      "U2 F U F'",
+    ],
+  );
+  const protectedLeft = solvedCube().filter(
+    (s) => s.position[1] < 1 && !targetIds('left').includes(s.id),
+  );
+  for (const e of MIRRORED_EXERCISES) {
+    assert.ok(
+      isSolved(applyMoves(e.initial, e.setup.slice().reverse().map(inverse))),
+    );
+    const { corner, edge } = targetPieces(e.initial, 'left');
+    assert.deepEqual(corner.map((s) => s.color).sort(), [
+      'blue',
+      'red',
+      'white',
+    ]);
+    assert.deepEqual(edge.map((s) => s.color).sort(), ['blue', 'red']);
+    for (const s of corner) assert.deepEqual(s.position, [-1, 1, 1]);
+    for (const s of edge) assert.deepEqual(s.position, [0, 1, -1]);
+    assert.deepEqual(
+      corner.find((s) => s.color === 'white')!.normal,
+      e.id <= 2 ? NORMALS.L : e.id <= 4 ? NORMALS.F : NORMALS.U,
+    );
+    const topC = corner.find((s) => equal(s.normal, NORMALS.U))!.color;
+    const topE = edge.find((s) => equal(s.normal, NORMALS.U))!.color;
+    assert.equal(topE, e.definition.top);
+    if (e.id !== 5) assert.equal(topC === topE, e.id === 2 || e.id === 4);
+    const final = applyMoves(e.initial, e.solution);
+    for (const cube of [e.initial, final]) {
+      assert.ok(hasWhiteCross(cube));
+      assert.ok(areOtherSlotsSolved(cube, 'left'));
+      for (const original of protectedLeft)
+        assert.deepEqual(
+          cube.find((s) => s.id === original.id),
+          original,
+        );
+      for (const face of FACES)
+        assert.equal(centerColor(cube, face), centerColor(solvedCube(), face));
+    }
+    assert.ok(isPairFormed(final, 'left'));
+    let rotated = final;
+    for (let i = 0; i < 4; i++) {
+      assert.equal(trainingStatus(rotated, 'left'), 'paired');
+      rotated = applyMove(rotated, { face: 'Y', turns: 1 });
+    }
+    // Reflecting an original shorter solution back would contradict its exhaustive
+    // shortest-path test; mirror endpoints also independently preserve all pieces.
+    assert.equal(e.tokens.length, getExercise(e.id, e.variant).tokens.length);
+  }
+  const broken = applyMoves(getExercise(2, 0, 'left').initial, [
+    { face: 'L', turns: 1 },
+    { face: 'U', turns: 2 },
+    { face: 'L', turns: -1 },
+  ]);
+  assert.ok(isPairFormed(broken, 'left'));
+  assert.ok(hasWhiteCross(broken));
+  assert.equal(trainingStatus(broken, 'left'), 'slots-disturbed');
 });

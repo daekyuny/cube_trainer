@@ -13,7 +13,7 @@ import type { Face, Preset } from '../domain/cube/cube';
 import { CubeView } from '../features/simulator/CubeView';
 import { createSession, sessionReducer } from '../features/simulator/session';
 import { LessonPanel } from '../features/f2l/LessonPanel';
-import { TARGET_IDS, trainingStatus } from '../domain/f2l/lessons';
+import { targetIds, trainingStatus } from '../domain/f2l/lessons';
 
 const presets: { id: Preset; title: string; subtitle: string }[] = [
   { id: 'solved', title: '맞춘 큐브', subtitle: '여섯 면이 모두 완성된 상태' },
@@ -116,7 +116,9 @@ export function App() {
         ? '흰색 십자가 완성'
         : '자유롭게 연습 중';
   const activePreset = presets.find((preset) => preset.id === session.preset)!;
-  const pairStatus = session.lesson ? trainingStatus(session.cube) : null;
+  const pairStatus = session.lesson
+    ? trainingStatus(session.cube, session.lesson.side)
+    : null;
   const stageStatus =
     pairStatus === 'paired'
       ? '페어 완성 · 십자·세 슬롯 유지'
@@ -205,7 +207,9 @@ export function App() {
                   move={command?.move}
                   progress={session.progress}
                   highlightIds={
-                    session.lesson && focus ? TARGET_IDS : undefined
+                    session.lesson && focus
+                      ? targetIds(session.lesson.side)
+                      : undefined
                   }
                 />
                 <div className="face-legend">
@@ -223,7 +227,9 @@ export function App() {
                   move={command?.move}
                   progress={session.progress}
                   highlightIds={
-                    session.lesson && focus ? TARGET_IDS : undefined
+                    session.lesson && focus
+                      ? targetIds(session.lesson.side)
+                      : undefined
                   }
                 />
                 <div className="face-legend">
@@ -233,7 +239,7 @@ export function App() {
             </div>
             <div className="stage-caption">
               {session.lesson
-                ? 'R·G·W 코너 · R·G 엣지 / 두 그림은 같은 큐브입니다.'
+                ? `R·${session.lesson.side === 'left' ? 'B' : 'G'}·W 코너 · R·${session.lesson.side === 'left' ? 'B' : 'G'} 엣지 / 두 그림은 같은 큐브입니다.`
                 : '같은 큐브의 여섯 면을 함께 보고 있어요.'}
             </div>
             <div className="yaw-controls">

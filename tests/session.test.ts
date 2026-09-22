@@ -170,3 +170,81 @@ test('F2L-04: demonstration, manual input, reset, undo and lesson switches share
   assert.equal(session.lesson!.id, 4);
   assert.equal(session.history.length, 0);
 });
+
+test('F2L-11: seek letters forward/backward animates real moves, independently of history', () => {
+  for (const side of ['right', 'left'] as const)
+    for (const id of [1, 2, 3, 4, 5] as const)
+      for (const variant of id === 5 ? [0, 1] : [0]) {
+        const e = getExercise(id, variant, side);
+        let session = sessionReducer(createSession(), {
+          type: 'lesson',
+          id,
+          variant,
+          side,
+        });
+        const boundaries = [0, ...e.tokens.map((token) => token.end)];
+        for (const to of [
+          ...boundaries.slice(1),
+          ...boundaries.slice(0, -1).reverse(),
+          e.solution.length,
+          0,
+        ]) {
+          const before = session.cube;
+          session = sessionReducer(session, { type: 'seek', cursor: to });
+          assert.equal(session.cube, before, 'no snapping before animation');
+          assert.ok(session.queue.length);
+          assert.equal(
+            sessionReducer(session, { type: 'seek', cursor: 0 }),
+            session,
+            'ignore busy seeking',
+          );
+          session = drain(session);
+          assert.deepEqual(session.cube, e.checkpoints[to]);
+          assert.equal(session.lesson!.cursor, to);
+          session = sessionReducer(session, { type: 'clear-history' });
+        }
+      }
+});
+
+test('F2L-11: partial U2, backward undo, off-path input and stale frames remain coherent', () => {
+  let session = sessionReducer(createSession(), {
+    type: 'lesson',
+    id: 5,
+    variant: 1,
+  });
+  const e = getExercise(5, 1);
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'U', turns: 1 } }),
+  );
+  assert.equal(session.lesson!.cursor, 1);
+  session = drain(sessionReducer(session, { type: 'seek', cursor: 2 }));
+  assert.deepEqual(session.cube, e.checkpoints[2]);
+  session = sessionReducer(session, { type: 'clear-history' });
+  session = drain(sessionReducer(session, { type: 'seek', cursor: 0 }));
+  session = drain(sessionReducer(session, { type: 'undo' }));
+  assert.deepEqual(session.cube, e.checkpoints[1]);
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'D', turns: 1 } }),
+  );
+  assert.equal(session.lesson!.cursor, null);
+  assert.equal(sessionReducer(session, { type: 'seek', cursor: 0 }), session);
+  session = sessionReducer(session, { type: 'restart' });
+  for (const cursor of [-1, 1.5, NaN, 100])
+    assert.equal(sessionReducer(session, { type: 'seek', cursor }), session);
+  session = sessionReducer(session, {
+    type: 'seek',
+    cursor: e.solution.length,
+  });
+  const stale = session.queue[0];
+  session = sessionReducer(session, {
+    type: 'lesson',
+    id: 5,
+    variant: 1,
+    side: 'left',
+  });
+  assert.equal(
+    sessionReducer(session, { type: 'frame', progress: 1, command: stale }),
+    session,
+  );
+  assert.deepEqual(session.cube, getExercise(5, 1, 'left').initial);
+});

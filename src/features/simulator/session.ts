@@ -5,9 +5,9 @@ import {
   guideCursor,
   trainingStatus,
 } from '../../domain/f2l/lessons.ts';
-import type { LessonId } from '../../domain/f2l/lessons.ts';
+import type { LessonId, LessonSide } from '../../domain/f2l/lessons.ts';
 
-export type QueuedMove = { move: Move; undo?: boolean };
+export type QueuedMove = { move: Move; undo?: boolean; backward?: boolean };
 export type Session = {
   cube: Cube;
   queue: QueuedMove[];
@@ -17,13 +17,19 @@ export type Session = {
   setup: Move[];
   message: string;
   initial: Cube;
-  lesson: { id: LessonId; variant: number; cursor: number | null } | null;
+  lesson: {
+    side: LessonSide;
+    id: LessonId;
+    variant: number;
+    cursor: number | null;
+  } | null;
 };
 export type Action =
   | { type: 'move'; move: Move }
   | { type: 'frame'; progress: number; command: QueuedMove }
   | { type: 'preset'; preset: Preset }
-  | { type: 'lesson'; id: LessonId; variant?: number }
+  | { type: 'lesson'; id: LessonId; variant?: number; side?: LessonSide }
+  | { type: 'seek'; cursor: number }
   | { type: 'guide'; wholeStage?: boolean }
   | { type: 'clear-history' }
   | { type: 'restart' }
@@ -47,7 +53,11 @@ export function createSession(preset: Preset = 'solved'): Session {
 export function sessionReducer(state: Session, action: Action): Session {
   if (action.type === 'preset') return createSession(action.preset);
   if (action.type === 'lesson') {
-    const exercise = getExercise(action.id, action.variant ?? 0);
+    const exercise = getExercise(
+      action.id,
+      action.variant ?? 0,
+      action.side ?? 'right',
+    );
     return {
       cube: exercise.initial,
       initial: exercise.initial,
@@ -57,7 +67,12 @@ export function sessionReducer(state: Session, action: Action): Session {
       progress: 0,
       history: [],
       message: '',
-      lesson: { id: action.id, variant: exercise.variant, cursor: 0 },
+      lesson: {
+        side: exercise.side,
+        id: action.id,
+        variant: exercise.variant,
+        cursor: 0,
+      },
     };
   }
   if (action.type === 'clear-history') {
@@ -81,15 +96,46 @@ export function sessionReducer(state: Session, action: Action): Session {
       lesson: state.lesson ? { ...state.lesson, cursor: 0 } : null,
     };
   }
+  if (action.type === 'seek') {
+    if (state.queue.length || !state.lesson || state.lesson.cursor === null)
+      return state;
+    const exercise = getExercise(
+      state.lesson.id,
+      state.lesson.variant,
+      state.lesson.side,
+    );
+    const from = state.lesson.cursor;
+    const to = action.cursor;
+    if (
+      !Number.isInteger(to) ||
+      to < 0 ||
+      to > exercise.solution.length ||
+      to === from
+    )
+      return state;
+    // Record actual inverse turns too: seeking must work even after history reset.
+    const queue =
+      to > from
+        ? exercise.solution.slice(from, to).map((move) => ({ move }))
+        : exercise.solution
+            .slice(to, from)
+            .reverse()
+            .map((move) => ({ move: inverse(move), backward: true }));
+    return { ...state, queue, message: '' };
+  }
   if (action.type === 'guide') {
     if (
       state.queue.length ||
       !state.lesson ||
       state.lesson.cursor === null ||
-      trainingStatus(state.cube) === 'paired'
+      trainingStatus(state.cube, state.lesson.side) === 'paired'
     )
       return state;
-    const exercise = getExercise(state.lesson.id, state.lesson.variant);
+    const exercise = getExercise(
+      state.lesson.id,
+      state.lesson.variant,
+      state.lesson.side,
+    );
     const cursor = state.lesson.cursor;
     const end = action.wholeStage
       ? (exercise.stages.find((stage) => stage.end > cursor)?.end ?? cursor)
@@ -129,10 +175,14 @@ export function sessionReducer(state: Session, action: Action): Session {
       ? {
           ...state.lesson,
           cursor: guideCursor(
-            getExercise(state.lesson.id, state.lesson.variant),
+            getExercise(
+              state.lesson.id,
+              state.lesson.variant,
+              state.lesson.side,
+            ),
             cube,
             state.lesson.cursor,
-            action.command.undo,
+            action.command.undo || action.command.backward,
           ),
         }
       : null,
