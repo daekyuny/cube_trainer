@@ -385,3 +385,108 @@ test('F2L-11: reverse seeking animates both cubes and mirror switching cancels i
   );
   expect(await page.getByTestId('cube-front').innerHTML()).toEqual(mirrored);
 });
+
+test('F2L-12: view a solution from the back, reverse it, and keep original notation', async ({
+  page,
+}) => {
+  for (let i = 0; i < 2; i++)
+    await page
+      .getByRole('button', {
+        name: '큐브 전체 오른쪽으로 90도 회전',
+        exact: true,
+      })
+      .click();
+  await expect(page.getByTestId('cube-stage')).toHaveAttribute(
+    'data-busy',
+    'false',
+  );
+  const initial = await page.locator('.cube-stage').innerHTML();
+  await expect(
+    page.getByRole('button', { name: '다음 · R', exact: true }),
+  ).toBeEnabled();
+  await expect(page.locator('.solution-reference')).toContainText(
+    '현재 화면 L',
+  );
+  await expect(page.locator('.solution-token')).toHaveText(['R', "U'", "R'"]);
+  await page.getByRole('button', { name: '전체 시연' }).click();
+  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
+    'data-status',
+    'paired',
+  );
+  await expect(page.getByTestId('cube-front')).toHaveAttribute(
+    'aria-label',
+    /F 주황, R 파랑, U 노랑/,
+  );
+  await page.getByRole('button', { name: '수순 리셋', exact: true }).click();
+  await page.getByRole('button', { name: '시작', exact: true }).click();
+  await expect(page.getByTestId('cube-stage')).toHaveAttribute(
+    'data-busy',
+    'false',
+  );
+  expect(await page.locator('.cube-stage').innerHTML()).toEqual(initial);
+  await page.locator('.solution-token').first().click();
+  await page
+    .getByRole('button', { name: '큐브 전체 왼쪽으로 90도 회전', exact: true })
+    .click();
+  await page.getByRole('button', { name: '전체 시연' }).click();
+  await expect(page.getByTestId('lesson-status')).toHaveAttribute(
+    'data-status',
+    'paired',
+  );
+  await expect(page.getByTestId('cube-front')).toHaveAttribute(
+    'aria-label',
+    /F 초록, R 주황, U 노랑/,
+  );
+});
+
+test('F2L-13: option transitions resize briefly, cancel safely, and honor reduced motion', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  // Pause only layout animations so intermediate heights can be measured reliably.
+  await page.evaluate(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (this.matches('.lesson-item')) {
+        animation.pause();
+        animation.currentTime = 100;
+      }
+      return animation;
+    };
+  });
+  const first = page.locator('.lesson-item').nth(0);
+  const second = page.locator('.lesson-item').nth(1);
+  const expanded = (await first.boundingBox())!.height;
+  const collapsed = (await second.boundingBox())!.height;
+  await page.locator('.case-select').nth(1).click();
+  const shrinking = (await first.boundingBox())!.height;
+  const growing = (await second.boundingBox())!.height;
+  expect(shrinking).toBeGreaterThan(collapsed);
+  expect(shrinking).toBeLessThan(expanded);
+  expect(growing).toBeGreaterThan(collapsed);
+  await page
+    .locator('.case-select')
+    .nth(3)
+    .evaluate((el: HTMLButtonElement) => el.click());
+  await expect(page.locator('.lesson-expanded')).toHaveCount(1);
+  await expect(page.locator('.lesson-expanded')).toHaveAttribute(
+    'id',
+    'solution-4',
+  );
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect
+    .poll(() =>
+      page
+        .locator('.lesson-picker')
+        .evaluate((el) => el.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
+  await page.locator('.case-select').nth(0).click();
+  expect(
+    await page
+      .locator('.lesson-picker')
+      .evaluate((el) => el.getAnimations({ subtree: true }).length),
+  ).toBe(0);
+  await expect(page.getByRole('button', { name: '전체 시연' })).toBeEnabled();
+});

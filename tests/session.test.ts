@@ -4,7 +4,7 @@ import {
   createSession,
   sessionReducer,
 } from '../src/features/simulator/session.ts';
-import { applyMoves, isSolved } from '../src/domain/cube/cube.ts';
+import { applyMove, applyMoves, isSolved } from '../src/domain/cube/cube.ts';
 import { getExercise, trainingStatus } from '../src/domain/f2l/lessons.ts';
 
 function drain(session: ReturnType<typeof createSession>) {
@@ -247,4 +247,104 @@ test('F2L-11: partial U2, backward undo, off-path input and stale frames remain 
     session,
   );
   assert.deepEqual(session.cube, getExercise(5, 1, 'left').initial);
+});
+
+test('F2L-12: all RG/RB checkpoints follow forward and inverse algorithms in every viewing yaw', () => {
+  for (const side of ['right', 'left'] as const)
+    for (const id of [1, 2, 3, 4, 5] as const)
+      for (const variant of id === 5 ? [0, 1] : [0]) {
+        const e = getExercise(id, variant, side);
+        for (const yaw of [0, 1, 2, 3]) {
+          let session = sessionReducer(createSession(), {
+            type: 'lesson',
+            id,
+            side,
+            variant,
+          });
+          const view = (cube: typeof session.cube) => {
+            for (let i = 0; i < yaw; i++)
+              cube = applyMove(cube, { face: 'Y', turns: 1 });
+            return cube;
+          };
+          for (let i = 0; i < yaw; i++)
+            session = drain(
+              sessionReducer(session, {
+                type: 'move',
+                move: { face: 'Y', turns: 1 },
+              }),
+            );
+          assert.equal(session.lesson!.cursor, 0);
+          session = sessionReducer(session, { type: 'clear-history' });
+          session = sessionReducer(session, {
+            type: 'guide',
+            wholeStage: true,
+          });
+          for (let cursor = 1; session.queue.length; cursor++) {
+            session = sessionReducer(session, {
+              type: 'frame',
+              command: session.queue[0],
+              progress: 1,
+            });
+            assert.deepEqual(session.cube, view(e.checkpoints[cursor]));
+            assert.equal(session.lesson!.cursor, cursor);
+          }
+          assert.equal(trainingStatus(session.cube, side), 'paired');
+          session = sessionReducer(session, { type: 'seek', cursor: 0 });
+          for (
+            let cursor = e.solution.length - 1;
+            session.queue.length;
+            cursor--
+          ) {
+            session = sessionReducer(session, {
+              type: 'frame',
+              command: session.queue[0],
+              progress: 1,
+            });
+            assert.deepEqual(session.cube, view(e.checkpoints[cursor]));
+            assert.equal(session.lesson!.cursor, cursor);
+          }
+        }
+      }
+});
+
+test('F2L-12: changing view mid-solution, manual screen turns, undo and invalid paths', () => {
+  let session = sessionReducer(createSession(), { type: 'lesson', id: 1 });
+  session = drain(sessionReducer(session, { type: 'guide' }));
+  const afterR = session.cube;
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'Y', turns: 1 } }),
+  );
+  assert.equal(session.lesson!.cursor, 1);
+  session = drain(sessionReducer(session, { type: 'undo' }));
+  assert.deepEqual(session.cube, afterR);
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'Y', turns: -1 } }),
+  );
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'U', turns: -1 } }),
+  );
+  assert.equal(session.lesson!.cursor, 2);
+  // After a left yaw the original green/right face is on the screen's back.
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'B', turns: -1 } }),
+  );
+  assert.equal(session.lesson!.cursor, 3);
+  assert.equal(trainingStatus(session.cube), 'paired');
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'D', turns: 1 } }),
+  );
+  assert.equal(session.lesson!.cursor, null);
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'Y', turns: 1 } }),
+  );
+  assert.equal(
+    session.lesson!.cursor,
+    null,
+    'yaw must not hide an actual wrong face turn',
+  );
+  session = drain(sessionReducer(session, { type: 'undo' }));
+  session = drain(sessionReducer(session, { type: 'undo' }));
+  assert.equal(session.lesson!.cursor, 3);
+  session = sessionReducer(session, { type: 'restart' });
+  assert.deepEqual(session.cube, getExercise(1).initial);
 });

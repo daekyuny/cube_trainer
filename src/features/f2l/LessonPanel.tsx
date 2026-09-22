@@ -1,10 +1,14 @@
 import { useState } from 'react';
+import { useLessonTransition } from './useLessonTransition';
+import { notation } from '../../domain/cube/cube';
 import type { Dispatch } from 'react';
 import {
   COLOR_LETTERS,
   getExercise,
   LESSONS,
   trainingStatus,
+  lessonMove,
+  lessonViewTurns,
 } from '../../domain/f2l/lessons';
 import type { LessonId, LessonSide } from '../../domain/f2l/lessons';
 import type { Action, Session } from '../simulator/session';
@@ -23,6 +27,11 @@ export function LessonPanel({
   const [showGuide, setShowGuide] = useState(true);
   const [sides, setSides] = useState<Partial<Record<LessonId, LessonSide>>>({});
   const lesson = session.lesson!;
+  const { container: lessonPickerRef, prepare: prepareTransition } =
+    useLessonTransition(
+      `${lesson.id}/${lesson.side}/${lesson.variant}/${showGuide}`,
+    );
+  const rotated = lessonViewTurns(session.cube) !== 0;
   const exercise = getExercise(lesson.id, lesson.variant, lesson.side);
   const cursor = lesson.cursor;
   const busy = session.queue.length > 0;
@@ -33,6 +42,13 @@ export function LessonPanel({
     cursor === null
       ? undefined
       : exercise.tokens.find((token) => token.end > cursor);
+  const nextScreenMove =
+    next && cursor !== null
+      ? lessonMove(session.cube, {
+          ...exercise.solution[cursor],
+          turns: next.end - cursor === 2 ? 2 : exercise.solution[cursor].turns,
+        })
+      : undefined;
   const previous =
     cursor === null
       ? undefined
@@ -40,6 +56,7 @@ export function LessonPanel({
           .filter((end) => end < cursor)
           .at(-1);
   const select = (id: LessonId, side = sides[id] ?? 'right') => {
+    prepareTransition();
     setSides((old) => ({ ...old, [id]: side }));
     dispatch({ type: 'lesson', id, side });
   };
@@ -66,7 +83,11 @@ export function LessonPanel({
       <p className="lesson-premise">
         W 십자가·다른 세 슬롯 완성에서 시작 · ⇄ 좌우 대칭
       </p>
-      <div className="lesson-picker" aria-label="다섯 가지 페어링 유형">
+      <div
+        ref={lessonPickerRef}
+        className="lesson-picker"
+        aria-label="다섯 가지 페어링 유형"
+      >
         {LESSONS.map((item) => {
           const active = item.id === lesson.id;
           const side = active ? lesson.side : (sides[item.id] ?? 'right');
@@ -122,7 +143,10 @@ export function LessonPanel({
                       className="text-button"
                       aria-expanded={showGuide}
                       aria-controls="pair-guide"
-                      onClick={() => setShowGuide(!showGuide)}
+                      onClick={() => {
+                        prepareTransition();
+                        setShowGuide(!showGuide);
+                      }}
                     >
                       {showGuide ? '풀이 숨김' : '풀이 보기'}
                     </button>
@@ -189,6 +213,13 @@ export function LessonPanel({
                           </button>
                         ))}
                       </div>
+                      <p className="notation-note solution-reference">
+                        수순·설명은 빨강 앞 · 초록 오른쪽 기준입니다.
+                        {rotated &&
+                          next &&
+                          nextScreenMove &&
+                          ` 다음 ${next.label} → 현재 화면 ${notation(nextScreenMove)}`}
+                      </p>
                       <p className="notation-note">
                         문자를 누르면 그 수까지 · ← →로 이동 · U2는 180°
                       </p>
@@ -256,7 +287,8 @@ export function LessonPanel({
                   </div>
                   <div className="lesson-observation">
                     <p>
-                      W·R·{color} / R·{color} 슬롯 바로 위 · 앞·{direction} 위
+                      시작 기준: W·R·{color} / R·{color} 슬롯 바로 위 · 앞·
+                      {direction} 위
                       <br />
                       R·{color} 엣지 / Y층 뒤쪽 · O 센터 위 · 위는{' '}
                       {COLOR_LETTERS[exercise.definition.top]}
@@ -265,14 +297,15 @@ export function LessonPanel({
                   {lesson.id === 5 && (
                     <button
                       className="secondary-button variant-button"
-                      onClick={() =>
+                      onClick={() => {
+                        prepareTransition();
                         dispatch({
                           type: 'lesson',
                           id: 5,
                           side: lesson.side,
                           variant: (lesson.variant + 1) % exercise.variantCount,
-                        })
-                      }
+                        });
+                      }}
                     >
                       엣지 윗색 바꾸기 · 현재{' '}
                       {COLOR_LETTERS[exercise.definition.top]}

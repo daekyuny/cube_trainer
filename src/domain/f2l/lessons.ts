@@ -4,6 +4,7 @@ import {
   equal,
   centerColor,
   FACES,
+  FACE_COLORS,
   NORMALS,
   hasWhiteCross,
   solvedCube,
@@ -338,12 +339,32 @@ function sameCube(a: Cube, b: Cube): boolean {
   );
 }
 
+// Centers encode the viewing yaw independently of history (which can be cleared).
+export function lessonViewTurns(cube: Cube): number {
+  return (['F', 'L', 'B', 'R'] as const).findIndex(
+    (face) => centerColor(cube, face) === 'red',
+  );
+}
+
+// Printed algorithms always use red-front / green-right coordinates. Only the
+// executed face changes when the learner views the same exercise from another side.
+export function lessonMove(cube: Cube, move: Move): Move {
+  if (move.face === 'Y') return move;
+  const color = FACE_COLORS[move.face];
+  return {
+    ...move,
+    face: FACES.find((face) => centerColor(cube, face) === color)!,
+  };
+}
+
 export function guideCursor(
   exercise: Exercise,
   cube: Cube,
   previous: number | null,
   undo = false,
 ): number | null {
+  for (let turn = lessonViewTurns(cube); turn > 0; turn--)
+    cube = applyMove(cube, { face: 'Y', turns: -1 });
   const preferred = previous === null ? -1 : previous + (undo ? -1 : 1);
   if (
     exercise.checkpoints[preferred] &&

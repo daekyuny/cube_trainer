@@ -3,6 +3,7 @@ import type { Cube, Move, Preset } from '../../domain/cube/cube.ts';
 import {
   getExercise,
   guideCursor,
+  lessonMove,
   trainingStatus,
 } from '../../domain/f2l/lessons.ts';
 import type { LessonId, LessonSide } from '../../domain/f2l/lessons.ts';
@@ -116,11 +117,16 @@ export function sessionReducer(state: Session, action: Action): Session {
     // Record actual inverse turns too: seeking must work even after history reset.
     const queue =
       to > from
-        ? exercise.solution.slice(from, to).map((move) => ({ move }))
+        ? exercise.solution
+            .slice(from, to)
+            .map((move) => ({ move: lessonMove(state.cube, move) }))
         : exercise.solution
             .slice(to, from)
             .reverse()
-            .map((move) => ({ move: inverse(move), backward: true }));
+            .map((move) => ({
+              move: lessonMove(state.cube, inverse(move)),
+              backward: true,
+            }));
     return { ...state, queue, message: '' };
   }
   if (action.type === 'guide') {
@@ -142,7 +148,9 @@ export function sessionReducer(state: Session, action: Action): Session {
       : cursor + 1;
     return {
       ...state,
-      queue: exercise.solution.slice(cursor, end).map((move) => ({ move })),
+      queue: exercise.solution
+        .slice(cursor, end)
+        .map((move) => ({ move: lessonMove(state.cube, move) })),
       message: '',
     };
   }
