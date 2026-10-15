@@ -12,6 +12,7 @@ import {
 import type { Face, Preset } from '../domain/cube/cube';
 import { CubeView } from '../features/simulator/CubeView';
 import { createSession, sessionReducer } from '../features/simulator/session';
+import { useCubeDrag } from '../features/simulator/useCubeDrag';
 import { LessonPanel } from '../features/f2l/LessonPanel';
 import { LastLayerPanel } from '../features/last-layer/LastLayerPanel';
 import { targetIds, trainingStatus } from '../domain/f2l/lessons';
@@ -73,6 +74,12 @@ export function App() {
   const [slow, setSlow] = useState(false);
   const [focus, setFocus] = useState(true);
   const command = session.queue[0];
+  const drag = useCubeDrag({ busy: Boolean(command), slow, dispatch });
+  // A queued command always wins; otherwise show the live drag preview.
+  const shownMove = command?.move ?? drag.preview?.move;
+  const shownProgress = command
+    ? session.progress
+    : (drag.preview?.progress ?? 0);
 
   useEffect(() => {
     if (!command) return;
@@ -81,10 +88,14 @@ export function App() {
     const reduced = window.matchMedia(
       '(prefers-reduced-motion: reduce)',
     ).matches;
-    const duration = reduced ? 0 : slow ? 650 : 260;
+    // A released drag resumes from its angle and only animates the remainder.
+    const from = command.from ?? 0;
+    const duration = (reduced ? 0 : slow ? 650 : 260) * (1 - from);
     const tick = (time: number) => {
       start ??= time;
-      const progress = duration ? Math.min(1, (time - start) / duration) : 1;
+      const progress = duration
+        ? from + (1 - from) * Math.min(1, (time - start) / duration)
+        : 1;
       dispatch({ type: 'frame', progress, command });
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
@@ -236,6 +247,8 @@ export function App() {
               className="cube-stage"
               data-testid="cube-stage"
               data-busy={Boolean(command)}
+              data-dragging={Boolean(drag.preview)}
+              {...drag.handlers}
             >
               <figure className="primary-cube">
                 <figcaption>
@@ -244,8 +257,8 @@ export function App() {
                 </figcaption>
                 <CubeView
                   cube={session.cube}
-                  move={command?.move}
-                  progress={session.progress}
+                  move={shownMove}
+                  progress={shownProgress}
                   highlightIds={highlightIds}
                 />
                 <div className="face-legend">
@@ -260,8 +273,8 @@ export function App() {
                 <CubeView
                   cube={session.cube}
                   reverse
-                  move={command?.move}
-                  progress={session.progress}
+                  move={shownMove}
+                  progress={shownProgress}
                   highlightIds={highlightIds}
                 />
                 <div className="face-legend">

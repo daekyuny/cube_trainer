@@ -10,6 +10,7 @@ import {
 } from '../../domain/cube/cube';
 import type { Cube, Face, Move, Vec3 } from '../../domain/cube/cube';
 import { COLOR_LETTERS } from '../../domain/f2l/lessons';
+import { projectPoint, viewCamera as cameraFor } from './gesture';
 
 type Props = {
   cube: Cube;
@@ -26,9 +27,6 @@ const scale = (a: Vec3, value: number): Vec3 => [
   a[1] * value,
   a[2] * value,
 ];
-const right: Vec3 = [0.91, 0, -0.415];
-const up: Vec3 = [-0.2075, 0.866, -0.455];
-const camera: Vec3 = [0.3594, 0.5, 0.7881];
 
 export function CubeView({
   cube,
@@ -37,12 +35,8 @@ export function CubeView({
   progress,
   highlightIds,
 }: Props) {
-  const viewUp = scale(up, reverse ? -1 : 1);
-  const viewCamera = scale(camera, reverse ? -1 : 1);
-  const project = (point: Vec3) => [
-    190 + dot(point, right) * 70,
-    180 - dot(point, viewUp) * 70,
-  ];
+  const viewCamera = cameraFor(reverse);
+  const project = (point: Vec3) => projectPoint(point, reverse);
   const active = move ? rotation(move) : null;
   const eased = progress * progress * (3 - 2 * progress);
   const transform = (point: Vec3, position: Vec3) =>
@@ -58,6 +52,7 @@ export function CubeView({
     label: string;
     labelPosition: number[];
     light: boolean;
+    grab?: { position: string; face: Face };
   }[] = [];
 
   for (let x = -1; x <= 1; x++)
@@ -114,6 +109,7 @@ export function CubeView({
             label: highlighted ? COLOR_LETTERS[sticker.color] : '',
             labelPosition: project(transform(middle, position)),
             light: sticker?.color === 'white' || sticker?.color === 'yellow',
+            grab: sticker ? { position: position.join(','), face } : undefined,
           });
         }
       }
@@ -129,6 +125,7 @@ export function CubeView({
       role="img"
       aria-label={`${reverse ? '뒤집어 본 큐브' : '기준 큐브'}: ${description}`}
       data-testid={reverse ? 'cube-back' : 'cube-front'}
+      data-view={reverse ? 'back' : 'front'}
     >
       <ellipse
         cx="190"
@@ -139,7 +136,11 @@ export function CubeView({
         opacity="0.07"
       />
       {polygons.map((polygon) => (
-        <g key={polygon.key}>
+        <g
+          key={polygon.key}
+          data-position={polygon.grab?.position}
+          data-face={polygon.grab?.face}
+        >
           <polygon
             points={polygon.points}
             fill="#26352f"

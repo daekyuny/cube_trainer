@@ -1278,3 +1278,22 @@ footer > span {
     display: none;
   }
 }
+/* Drag gestures: horizontal drags spin the cube, vertical swipes outside the
+   cube still scroll the page; on the cube itself every direction turns a layer. */
+.cube-stage {
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.cube-stage .cube-svg {
+  touch-action: none;
+}
+.cube-stage [data-face] {
+  cursor: pointer;
+}
+.cube-stage[data-dragging='true'],
+.cube-stage[data-dragging='true'] [data-face] {
+  cursor: grabbing;
+}

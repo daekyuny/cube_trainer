@@ -10,7 +10,13 @@ import type { LastLayerCaseId } from '../../domain/last-layer/cases.ts';
 import { guideCursor, lessonMove } from '../../domain/training/guide.ts';
 import type { GuidedExercise } from '../../domain/training/guide.ts';
 
-export type QueuedMove = { move: Move; undo?: boolean; backward?: boolean };
+// `from`: a released drag continues animating from the progress it reached.
+export type QueuedMove = {
+  move: Move;
+  undo?: boolean;
+  backward?: boolean;
+  from?: number;
+};
 export type Session = {
   cube: Cube;
   queue: QueuedMove[];
@@ -34,7 +40,7 @@ export type Lesson =
 export type F2LLesson = Extract<Lesson, { kind: 'f2l' }>;
 export type LastLayerLesson = Extract<Lesson, { kind: 'last-layer' }>;
 export type Action =
-  | { type: 'move'; move: Move }
+  | { type: 'move'; move: Move; from?: number }
   | { type: 'frame'; progress: number; command: QueuedMove }
   | { type: 'preset'; preset: Preset }
   | { type: 'lesson'; id: LessonId; variant?: number; side?: LessonSide }
@@ -188,9 +194,19 @@ export function sessionReducer(state: Session, action: Action): Session {
         ...state,
         message: '입력이 많이 쌓였습니다. 잠시 후 다시 눌러 주세요.',
       };
+    const from =
+      action.from !== undefined && !state.queue.length
+        ? Math.min(1, Math.max(0, action.from))
+        : undefined;
     return {
       ...state,
-      queue: [...state.queue, { move: action.move }],
+      queue: [
+        ...state.queue,
+        from === undefined
+          ? { move: action.move }
+          : { move: action.move, from },
+      ],
+      progress: state.queue.length ? state.progress : (from ?? 0),
       message: '',
     };
   }
