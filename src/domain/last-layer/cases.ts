@@ -5,6 +5,7 @@ import {
   hasFirstTwoLayers,
   inverse,
   isSolved,
+  normalizeOrientation,
   NORMALS,
   solvedCube,
 } from '../cube/cube.ts';
@@ -311,12 +312,13 @@ export function areTopCornersPermuted(cube: Cube): boolean {
 
 export type LastLayerStatus = 'complete' | 'needs-auf' | 'f2l-open' | 'working';
 
-// Status only reads the actual cube, so any correct path is accepted and the
-// whole-cube horizontal rotation never changes the result.
+// Status only reads the actual cube, so any correct path is accepted, and it
+// is judged white down / red front so whole-cube rotations never change it.
 export function lastLayerStatus(
   cube: Cube,
   step: LastLayerStep,
 ): LastLayerStatus {
+  cube = normalizeOrientation(cube);
   if (!hasFirstTwoLayers(cube)) return 'f2l-open';
   if (step === 'oll-edges')
     return hasYellowCross(cube) ? 'complete' : 'working';

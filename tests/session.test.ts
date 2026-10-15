@@ -2,10 +2,19 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   createSession,
+  isLessonComplete,
+  lessonExercise,
   sessionReducer,
 } from '../src/features/simulator/session.ts';
+import type { Action } from '../src/features/simulator/session.ts';
+import { LAST_LAYER_EXERCISES } from '../src/domain/last-layer/cases.ts';
 import { applyMove, applyMoves, isSolved } from '../src/domain/cube/cube.ts';
-import { getExercise, trainingStatus } from '../src/domain/f2l/lessons.ts';
+import type { Move } from '../src/domain/cube/cube.ts';
+import {
+  EXERCISES,
+  getExercise,
+  trainingStatus,
+} from '../src/domain/f2l/lessons.ts';
 
 function drain(session: ReturnType<typeof createSession>) {
   while (session.queue.length)
@@ -347,4 +356,52 @@ test('F2L-12: changing view mid-solution, manual screen turns, undo and invalid 
   assert.equal(session.lesson!.cursor, 3);
   session = sessionReducer(session, { type: 'restart' });
   assert.deepEqual(session.cube, getExercise(1).initial);
+});
+
+test('ORIENT-01: lessons judge and demonstrate correctly after vertical whole-cube flips', () => {
+  const views: Move[][] = [
+    [{ face: 'X', turns: 1 }],
+    [{ face: 'X', turns: 2 }],
+    [
+      { face: 'Z', turns: -1 },
+      { face: 'Y', turns: 1 },
+    ],
+  ];
+  const starts: Action[] = [
+    ...EXERCISES.map(
+      (e) => ({ type: 'lesson', id: e.id, variant: e.variant }) as Action,
+    ),
+    ...LAST_LAYER_EXERCISES.map(
+      (e) => ({ type: 'last-layer', id: e.case.id }) as Action,
+    ),
+  ];
+  for (const start of starts)
+    for (const view of views) {
+      let session = sessionReducer(createSession(), start);
+      for (const move of view)
+        session = drain(sessionReducer(session, { type: 'move', move }));
+      // Whole-cube turns are never "off the path".
+      assert.equal(session.lesson!.cursor, 0);
+      assert.equal(isLessonComplete(session.lesson!, session.cube), false);
+      session = drain(
+        sessionReducer(session, { type: 'guide', wholeStage: true }),
+      );
+      const exercise = lessonExercise(session.lesson!);
+      assert.equal(session.lesson!.cursor, exercise.solution.length);
+      assert.equal(isLessonComplete(session.lesson!, session.cube), true);
+      // The demonstration turned the faces the learner sees, not printed ones.
+      assert.deepEqual(
+        session.cube,
+        applyMoves(exercise.checkpoints.at(-1)!, view),
+      );
+      // A middle-layer turn leaves the guided path.
+      session = drain(
+        sessionReducer(session, {
+          type: 'move',
+          move: { face: 'M', turns: 1 },
+        }),
+      );
+      assert.equal(session.lesson!.cursor, null);
+      assert.equal(isLessonComplete(session.lesson!, session.cube), false);
+    }
 });

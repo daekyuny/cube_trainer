@@ -2,7 +2,10 @@ export type Vec3 = readonly [number, number, number];
 export type Face = 'F' | 'R' | 'U' | 'D' | 'L' | 'B';
 export type Color = 'red' | 'green' | 'yellow' | 'white' | 'blue' | 'orange';
 export type Axis = 0 | 1 | 2;
-export type Move = { face: Face | 'Y'; turns: 1 | -1 | 2 };
+export type Slice = 'M' | 'E' | 'S';
+// Whole-cube rotations x / y / z (upper case keeps one Move type).
+export type CubeRotation = 'X' | 'Y' | 'Z';
+export type Move = { face: Face | Slice | CubeRotation; turns: 1 | -1 | 2 };
 export type Sticker = {
   id: string;
   position: Vec3;
@@ -13,6 +16,20 @@ export type Cube = readonly Sticker[];
 export type Preset = 'solved' | 'random' | 'cross' | 'f2l';
 
 export const FACES: Face[] = ['F', 'R', 'U', 'D', 'L', 'B'];
+export const SLICES: Slice[] = ['M', 'E', 'S'];
+export const ROTATIONS: CubeRotation[] = ['X', 'Y', 'Z'];
+// Standard directions: M follows L, E follows D, S follows F; x follows R,
+// y follows U, z follows F.
+const SLICE_REFERENCE: Record<Slice, Face> = { M: 'L', E: 'D', S: 'F' };
+const ROTATION_REFERENCE: Record<CubeRotation, Face> = {
+  X: 'R',
+  Y: 'U',
+  Z: 'F',
+};
+
+export function isCubeRotation(move: Move): boolean {
+  return ROTATIONS.includes(move.face as CubeRotation);
+}
 export const NORMALS: Record<Face, Vec3> = {
   F: [0, 0, 1],
   R: [1, 0, 0],
@@ -87,13 +104,18 @@ export function rotation(move: Move): {
   layer: number | null;
   angle: number;
 } {
-  if (move.face === 'Y')
-    return { axis: 1, layer: null, angle: (-move.turns * Math.PI) / 2 };
-  const normal = NORMALS[move.face];
+  const whole = ROTATIONS.includes(move.face as CubeRotation);
+  const slice = SLICES.includes(move.face as Slice);
+  const reference = whole
+    ? ROTATION_REFERENCE[move.face as CubeRotation]
+    : slice
+      ? SLICE_REFERENCE[move.face as Slice]
+      : (move.face as Face);
+  const normal = NORMALS[reference];
   const axis = normal.findIndex((value) => value !== 0) as Axis;
   return {
     axis,
-    layer: normal[axis],
+    layer: whole ? null : slice ? 0 : normal[axis],
     angle: (-normal[axis] * move.turns * Math.PI) / 2,
   };
 }
@@ -124,8 +146,12 @@ export function applyMoves(cube: Cube, moves: readonly Move[]): Cube {
 }
 
 export function notation(move: Move): string {
-  if (move.face === 'Y') return move.turns === 1 ? '→' : '←';
-  return move.face + (move.turns === -1 ? "'" : move.turns === 2 ? '2' : '');
+  if (move.face === 'Y' && move.turns !== 2)
+    return move.turns === 1 ? '→' : '←';
+  const suffix = move.turns === -1 ? "'" : move.turns === 2 ? '2' : '';
+  return isCubeRotation(move)
+    ? move.face.toLowerCase() + suffix
+    : move.face + suffix;
 }
 
 export function centerColor(cube: Cube, face: Face): Color {
@@ -142,7 +168,35 @@ export function isSolved(cube: Cube): boolean {
   );
 }
 
+// Turn the whole cube (as x/y/z do) so white is down and red is front. Centers
+// always form a rigid frame, even after slice moves, so one of 24 orientations
+// matches. Status checks use this so viewing angle never changes a result.
+const UPRIGHT: Move[][] = [
+  [],
+  [{ face: 'X', turns: 1 }],
+  [{ face: 'X', turns: 2 }],
+  [{ face: 'X', turns: -1 }],
+  [{ face: 'Z', turns: 1 }],
+  [{ face: 'Z', turns: -1 }],
+];
+export function normalizeOrientation(cube: Cube): Cube {
+  for (const prefix of UPRIGHT) {
+    let turned = applyMoves(cube, prefix);
+    if (centerColor(turned, 'D') !== 'white') continue;
+    for (let turn = 0; turn < 4; turn++) {
+      if (centerColor(turned, 'F') === 'red') return turned;
+      turned = applyMove(turned, { face: 'Y', turns: 1 });
+    }
+  }
+  return cube;
+}
+
+export function isStandardOrientation(cube: Cube): boolean {
+  return centerColor(cube, 'D') === 'white' && centerColor(cube, 'F') === 'red';
+}
+
 export function hasWhiteCross(cube: Cube): boolean {
+  cube = normalizeOrientation(cube);
   return (
     cube
       .filter(
@@ -162,6 +216,7 @@ export function hasWhiteCross(cube: Cube): boolean {
 }
 
 export function hasFirstTwoLayers(cube: Cube): boolean {
+  cube = normalizeOrientation(cube);
   return (
     cube
       .filter((s) => s.position[1] < 1)

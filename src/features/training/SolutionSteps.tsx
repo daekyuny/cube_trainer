@@ -1,7 +1,7 @@
 import type { Dispatch, ReactNode } from 'react';
 import { notation } from '../../domain/cube/cube';
 import type { Cube } from '../../domain/cube/cube';
-import { lessonMove, lessonViewTurns } from '../../domain/training/guide';
+import { isLessonView, lessonMove } from '../../domain/training/guide';
 import type { GuidedExercise } from '../../domain/training/guide';
 import type { Action } from '../simulator/session';
 
@@ -24,7 +24,7 @@ export function SolutionSteps({
   doneLabel: string;
   children?: ReactNode;
 }) {
-  const rotated = lessonViewTurns(cube) !== 0;
+  const rotated = !isLessonView(cube);
   const next =
     cursor === null
       ? undefined

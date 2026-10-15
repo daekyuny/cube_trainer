@@ -12,9 +12,13 @@ import {
   inverse,
   isSolved,
   makePreset,
+  normalizeOrientation,
+  notation,
+  ROTATIONS,
+  SLICES,
   solvedCube,
 } from '../src/domain/cube/cube.ts';
-import type { Cube, Face, Vec3 } from '../src/domain/cube/cube.ts';
+import type { Cube, Face, Move, Vec3 } from '../src/domain/cube/cube.ts';
 
 function state(cube: Cube) {
   return cube.map((s) => `${s.position}:${s.normal}:${s.color}`).sort();
@@ -30,7 +34,7 @@ test('initial colors and opposite centers follow the requested orientation', () 
   assert.ok(isSolved(cube));
 });
 
-for (const face of [...FACES, 'Y'] as const) {
+for (const face of [...FACES, ...SLICES, ...ROTATIONS] as const) {
   test(`${face}: inverse, four turns and half-turn agree without mutating input`, () => {
     const cube = solvedCube();
     const before = JSON.stringify(cube);
@@ -85,6 +89,69 @@ test('horizontal rotation changes the front reference and leaves U/D centers fix
     turns: 1,
   });
   assert.deepEqual(state(frontTurn), state(expected));
+});
+
+const parse = (text: string): Move[] =>
+  text.split(' ').map((token) => ({
+    face: token[0] as Move['face'],
+    turns: token.endsWith("'") ? -1 : token.endsWith('2') ? 2 : 1,
+  }));
+
+test('M/E/S follow L/D/F and x/y/z follow R/U/F, matching the standard identities', () => {
+  // Where the front (red) or top (yellow) center goes after one turn.
+  const centers: [string, Face, string][] = [
+    ['M', 'D', 'red'],
+    ['E', 'R', 'red'],
+    ['S', 'R', 'yellow'],
+    ['X', 'U', 'red'],
+    ['Y', 'L', 'red'],
+    ['Z', 'R', 'yellow'],
+  ];
+  for (const [move, face, color] of centers)
+    assert.equal(
+      centerColor(applyMoves(solvedCube(), parse(move)), face),
+      color,
+      move,
+    );
+  // x = R M′ L′, y = U E′ D′, z = F S B′ (same final state).
+  for (const [rotationMove, layers] of [
+    ['X', "R M' L'"],
+    ['Y', "U E' D'"],
+    ['Z', "F S B'"],
+  ])
+    assert.deepEqual(
+      state(applyMoves(solvedCube(), parse(rotationMove))),
+      state(applyMoves(solvedCube(), parse(layers))),
+    );
+  assert.deepEqual(
+    [
+      { face: 'M', turns: -1 },
+      { face: 'X', turns: 1 },
+      { face: 'Z', turns: -1 },
+      { face: 'Y', turns: 1 },
+      { face: 'Y', turns: 2 },
+    ].map((move) => notation(move as Move)),
+    ["M'", 'x', "z'", '→', 'y2'],
+  );
+});
+
+test('orientation normalization recovers white down / red front from all 24 views', () => {
+  const scrambled = applyMoves(solvedCube(), parse("R U2 F' L D B2 M E' S"));
+  const reference = normalizeOrientation(scrambled);
+  assert.equal(centerColor(reference, 'D'), 'white');
+  assert.equal(centerColor(reference, 'F'), 'red');
+  const views = new Set<string>();
+  for (const first of ['', 'X', 'X2', "X'", 'Z', "Z'"])
+    for (const yaw of ['', 'Y', 'Y2', "Y'"]) {
+      const moves = parse([first, yaw].filter(Boolean).join(' ') || 'Y2 Y2');
+      const viewed = applyMoves(scrambled, moves);
+      views.add(`${centerColor(viewed, 'F')}${centerColor(viewed, 'U')}`);
+      assert.deepEqual(normalizeOrientation(viewed), reference);
+      // Cross / two-layer checks do not depend on how the cube is held.
+      const f2l = applyMoves(makePreset('f2l', () => 0.3).cube, moves);
+      assert.ok(hasFirstTwoLayers(f2l));
+    }
+  assert.equal(views.size, 24);
 });
 
 let seed = 924123;

@@ -1,5 +1,6 @@
 import {
   COLORS,
+  solvedCube,
   COLOR_NAMES,
   FACES,
   NORMALS,
@@ -12,6 +13,17 @@ import type { Cube, Face, Move, Vec3 } from '../../domain/cube/cube';
 import { COLOR_LETTERS } from '../../domain/f2l/lessons';
 import { projectPoint, viewCamera as cameraFor } from './gesture';
 
+// The white cross stays unmuted while lesson pieces are highlighted; track it
+// by piece identity so flipping the whole cube does not change what is shown.
+const CROSS_IDS = new Set(
+  solvedCube()
+    .filter(
+      (s) =>
+        s.position[1] === -1 &&
+        Math.abs(s.position[0]) + Math.abs(s.position[2]) <= 1,
+    )
+    .map((s) => s.id),
+);
 type Props = {
   cube: Cube;
   reverse?: boolean;
@@ -87,14 +99,11 @@ export function CubeView({
             (s) => equal(s.position, position) && equal(s.normal, normal),
           );
           const highlighted = sticker && highlightIds?.includes(sticker.id);
-          const crossPosition =
-            position[1] === -1 &&
-            Math.abs(position[0]) + Math.abs(position[2]) <= 1;
           const muted =
             highlightIds &&
             sticker &&
             !highlighted &&
-            !crossPosition &&
+            !CROSS_IDS.has(sticker.id) &&
             !equal(position, normal);
           polygons.push({
             key: `${x}:${y}:${z}:${face}`,

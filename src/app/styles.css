@@ -1297,3 +1297,32 @@ footer > span {
 .cube-stage[data-dragging='true'] [data-face] {
   cursor: grabbing;
 }
+.extra-moves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 8px 0;
+}
+.extra-move {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid #dbe3d5;
+  border-radius: 10px;
+  background: #f5f7f0;
+  padding: 3px 4px;
+}
+.extra-move strong {
+  font-size: 16px;
+  font-weight: 650;
+}
+.extra-move span {
+  font-size: 9px;
+  color: #829079;
+  white-space: nowrap;
+}
+.extra-move:nth-child(n + 4) {
+  background: #eef3ea;
+}

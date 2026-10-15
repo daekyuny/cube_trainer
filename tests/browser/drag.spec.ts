@@ -71,43 +71,94 @@ test('DRAG-06: dragging a sticker past half a turn commits; a short drag springs
   );
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('RFD');
-  // A middle layer has no turn: nothing moves.
-  await drag(page, await center(sticker(page, 'front', '0,0,1', 'F')), 260, 0);
+  // Middle row sideways = E, middle column up = M′.
+  const middle = await center(sticker(page, 'front', '0,0,1', 'F'));
+  await drag(page, middle, 260, 0);
   await idle(page);
-  await expect(page.getByLabel('회전 이력')).toHaveText('RFD');
+  await expect(page.getByLabel('회전 이력')).toHaveText('RFDE');
+  await drag(page, middle, 0, -260);
+  await idle(page);
+  await expect(page.getByLabel('회전 이력')).toHaveText("RFDEM'");
+  await expect(page.locator('.move-count')).toHaveText('5 moves');
   await page.getByRole('button', { name: '↶ 한 수 되돌리기' }).click();
-  await expect(page.getByLabel('회전 이력')).toHaveText('RF');
+  await expect(page.getByLabel('회전 이력')).toHaveText('RFDE');
 });
 
-test('DRAG-07: dragging outside the cube spins the whole cube like the yaw keys', async ({
+test('DRAG-07: dragging outside the cube along the nearest face grid turns the whole cube', async ({
   page,
 }) => {
   const svg = (await page.getByTestId('cube-front').boundingBox())!;
-  const blank = { x: svg.x + 8, y: svg.y + 8 };
-  await drag(page, blank, 60, 0);
+  // Beside the front face, and above the top face.
+  const side = { x: svg.x + 8, y: svg.y + svg.height * 0.64 };
+  const above = { x: svg.x + svg.width / 2, y: svg.y + 6 };
+  await drag(page, side, 40, 0);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toContainText('첫 회전');
-  await drag(page, blank, 320, 0);
+  await drag(page, side, 320, 0);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('←');
   await expect(page.getByTestId('cube-front')).toHaveAttribute(
     'aria-label',
     /F 파랑/,
   );
-  await drag(page, blank, -320, 0);
+  await drag(page, side, -320, 0);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('←→');
+  // Up beside the front tips the cube forward: x (white comes to the front).
+  await drag(page, side, 0, -320);
+  await idle(page);
+  await expect(page.getByLabel('회전 이력')).toHaveText('←→x');
   await expect(page.getByTestId('cube-front')).toHaveAttribute(
     'aria-label',
-    /F 빨강, R 초록/,
+    /F 흰색, R 초록, U 빨강/,
   );
-  // After spinning, a sticker drag follows the cube as it is now shown.
-  await drag(page, blank, 320, 0);
+  await expect(page.locator('.orientation-note')).toHaveText(
+    '빨강 위 · 주황 아래',
+  );
+  // Sideways above the top face rolls the cube: z.
+  await drag(page, above, 320, 0);
   await idle(page);
+  await expect(page.getByLabel('회전 이력')).toHaveText('←→xz');
+  await expect(page.locator('.move-count')).toHaveText('0 moves');
+  // A sticker drag follows the cube as it is now shown.
   await drag(page, await center(sticker(page, 'front', '1,0,1', 'F')), 0, -260);
   await idle(page);
-  await expect(page.getByLabel('회전 이력')).toHaveText('←→←R');
-  await expect(page.locator('.move-count')).toHaveText('1 moves');
+  await expect(page.getByLabel('회전 이력')).toHaveText('←→xzR');
+  await expect(page.locator('.live-badge')).toHaveText('자유롭게 연습 중');
+});
+
+test('DRAG-10: middle-layer and whole-cube keys and buttons', async ({
+  page,
+}) => {
+  // The key listener is attached in an effect right after the first render.
+  await expect(page.getByTestId('cube-front')).toHaveAttribute(
+    'aria-label',
+    /F 빨강/,
+  );
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(resolve)),
+  );
+  await page.keyboard.press('m');
+  await page.keyboard.press('Shift+E');
+  await page.keyboard.press('s');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('z');
+  await idle(page);
+  await expect(page.getByLabel('회전 이력')).toHaveText("ME'Sxz");
+  await expect(page.locator('.move-count')).toHaveText('3 moves');
+  await page
+    .getByRole('button', { name: 'E 가로 중간 · D 방향 시계 방향 회전' })
+    .click();
+  await page
+    .getByRole('button', { name: 'x 전체 · R 방향 시계 방향 회전' })
+    .click();
+  await idle(page);
+  await expect(page.getByLabel('회전 이력')).toHaveText("ME'SxzEx");
+  for (let i = 0; i < 7; i++)
+    await page.getByRole('button', { name: '↶ 한 수 되돌리기' }).click();
+  await expect(page.locator('.live-badge')).toHaveText('여섯 면 완성');
+  for (const button of await page.locator('.extra-move').all())
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 });
 
 test('DRAG-08: a drag in a lesson follows the guide like a key press', async ({

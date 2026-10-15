@@ -3,13 +3,16 @@ import {
   COLORS,
   COLOR_NAMES,
   FACES,
+  ROTATIONS,
+  SLICES,
   centerColor,
   hasFirstTwoLayers,
   hasWhiteCross,
+  isCubeRotation,
   isSolved,
   notation,
 } from '../domain/cube/cube';
-import type { Face, Preset } from '../domain/cube/cube';
+import type { Face, Move, Preset } from '../domain/cube/cube';
 import { CubeView } from '../features/simulator/CubeView';
 import { createSession, sessionReducer } from '../features/simulator/session';
 import { useCubeDrag } from '../features/simulator/useCubeDrag';
@@ -57,6 +60,16 @@ const firstCase: Record<'oll' | 'pll', LastLayerCaseId> = {
   oll: 'oll-line',
   pll: 'pll-t',
 };
+// Middle layers and whole-cube turns, beside the six face buttons.
+const extraMoves: { face: Move['face']; label: string; name: string }[] = [
+  { face: 'M', label: 'M', name: '세로 중간 · L 방향' },
+  { face: 'E', label: 'E', name: '가로 중간 · D 방향' },
+  { face: 'S', label: 'S', name: '앞뒤 중간 · F 방향' },
+  { face: 'X', label: 'x', name: '전체 · R 방향' },
+  { face: 'Y', label: 'y', name: '전체 · U 방향' },
+  { face: 'Z', label: 'z', name: '전체 · F 방향' },
+];
+const keyMoves: Move['face'][] = [...FACES, ...SLICES, ...ROTATIONS];
 const faceNames: Record<Face, string> = {
   F: '앞',
   R: '오른쪽',
@@ -118,8 +131,8 @@ export function App() {
           ))
       )
         return;
-      const face = event.key.toUpperCase() as Face;
-      if (FACES.includes(face)) {
+      const face = event.key.toUpperCase() as Move['face'];
+      if (keyMoves.includes(face)) {
         event.preventDefault();
         dispatch({
           type: 'move',
@@ -131,13 +144,20 @@ export function App() {
           type: 'move',
           move: { face: 'Y', turns: event.key === 'ArrowRight' ? 1 : -1 },
         });
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        // ↑ tips the front face up (x), ↓ tips it down (x′).
+        event.preventDefault();
+        dispatch({
+          type: 'move',
+          move: { face: 'X', turns: event.key === 'ArrowUp' ? 1 : -1 },
+        });
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
 
-  const turnFace = (face: Face, shift: boolean) =>
+  const turnFace = (face: Move['face'], shift: boolean) =>
     dispatch({
       type: 'move',
       move: { face, turns: counterclockwise || shift ? -1 : 1 },
@@ -217,7 +237,8 @@ export function App() {
             <h1>한 수씩, 큐브 연습</h1>
           </div>
           <span className="orientation-note">
-            <i /> 노랑 위 · 흰색 아래
+            <i /> {COLOR_NAMES[centerColor(session.cube, 'U')]} 위 ·{' '}
+            {COLOR_NAMES[centerColor(session.cube, 'D')]} 아래
           </span>
         </div>
         <nav className="practice-modes" aria-label="연습 모드">
@@ -239,7 +260,7 @@ export function App() {
                 <i /> {stageStatus}
               </span>
               <span className="move-count">
-                {session.history.filter((move) => move.face !== 'Y').length}{' '}
+                {session.history.filter((move) => !isCubeRotation(move)).length}{' '}
                 moves
               </span>
             </div>
@@ -341,7 +362,7 @@ export function App() {
                   session.history.slice(-36).map((move, index) => (
                     <span
                       key={index}
-                      className={move.face === 'Y' ? 'yaw-move' : ''}
+                      className={isCubeRotation(move) ? 'yaw-move' : ''}
                     >
                       {notation(move)}
                     </span>
@@ -420,6 +441,22 @@ export function App() {
                   </button>
                 ))}
               </div>
+              <div className="extra-moves" aria-label="중간층과 큐브 전체 회전">
+                {extraMoves.map((item) => (
+                  <button
+                    key={item.face}
+                    className="extra-move"
+                    onClick={(event) => turnFace(item.face, event.shiftKey)}
+                    aria-label={`${item.label} ${item.name} ${counterclockwise ? '반시계' : '시계'} 방향 회전`}
+                  >
+                    <strong>
+                      {item.label}
+                      {counterclockwise ? '′' : ''}
+                    </strong>
+                    <span>{item.name}</span>
+                  </button>
+                ))}
+              </div>
               <p className="keyboard-hint">
                 <kbd>F</kbd>
                 <kbd>R</kbd>
@@ -427,8 +464,17 @@ export function App() {
                 <kbd>D</kbd>
                 <kbd>L</kbd>
                 <kbd>B</kbd>
+                <kbd>M</kbd>
+                <kbd>E</kbd>
+                <kbd>S</kbd>
+                <kbd>X</kbd>
+                <kbd>Y</kbd>
+                <kbd>Z</kbd>
+                <kbd>↑</kbd>
+                <kbd>↓</kbd>
                 <span>
-                  <kbd>Shift</kbd> + 문자 키는 반시계 방향
+                  <kbd>Shift</kbd> + 문자 키는 반시계 방향 · ← → 전체 수평 · ↑ ↓
+                  전체 위아래
                 </span>
               </p>
               <label className="slow-control">

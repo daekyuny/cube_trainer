@@ -5,13 +5,14 @@ import {
   FACES,
   NORMALS,
   hasWhiteCross,
+  normalizeOrientation,
   solvedCube,
 } from '../cube/cube.ts';
 import type { Color, Cube, Move, Sticker } from '../cube/cube.ts';
 import { guideSteps, quarterTurns } from '../training/guide.ts';
 import type { SolutionToken } from '../training/guide.ts';
 
-export { guideCursor, lessonMove, lessonViewTurns } from '../training/guide.ts';
+export { guideCursor, isLessonView, lessonMove } from '../training/guide.ts';
 
 export type LessonSide = 'right' | 'left';
 export type LessonId = 1 | 2 | 3 | 4 | 5;
@@ -321,6 +322,8 @@ export function trainingStatus(
   | 'cross-broken'
   | 'slots-disturbed'
   | 'working' {
+  // Judge the cube as if held white down / red front, whatever the view.
+  cube = normalizeOrientation(cube);
   const paired = isPairFormed(cube, side);
   if (!hasWhiteCross(cube))
     return paired ? 'pair-cross-broken' : 'cross-broken';

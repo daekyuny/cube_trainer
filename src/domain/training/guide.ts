@@ -4,8 +4,9 @@ import {
   equal,
   FACES,
   FACE_COLORS,
+  normalizeOrientation,
 } from '../cube/cube.ts';
-import type { Cube, Move } from '../cube/cube.ts';
+import type { Cube, Face, Move } from '../cube/cube.ts';
 
 export type SolutionToken = { label: string; start: number; end: number };
 // A fixed start position and one printed algorithm, tracked per quarter turn.
@@ -66,18 +67,19 @@ function sameCube(a: Cube, b: Cube): boolean {
   );
 }
 
-// Centers encode the viewing yaw independently of history (which can be cleared).
-export function lessonViewTurns(cube: Cube): number {
-  return (['F', 'L', 'B', 'R'] as const).findIndex(
-    (face) => centerColor(cube, face) === 'red',
+// Centers encode the viewing orientation independently of history (which can
+// be cleared): printed algorithms use red front / green right / yellow up.
+export function isLessonView(cube: Cube): boolean {
+  return (
+    centerColor(cube, 'F') === 'red' && centerColor(cube, 'U') === 'yellow'
   );
 }
 
-// Printed algorithms always use red-front / green-right coordinates. Only the
-// executed face changes when the learner views the same exercise from another side.
+// Only the executed face changes when the learner views the same exercise
+// from another side or upside down. Printed algorithms use outer faces only.
 export function lessonMove(cube: Cube, move: Move): Move {
-  if (move.face === 'Y') return move;
-  const color = FACE_COLORS[move.face];
+  if (!FACES.includes(move.face as Face)) return move;
+  const color = FACE_COLORS[move.face as Face];
   return {
     ...move,
     face: FACES.find((face) => centerColor(cube, face) === color)!,
@@ -90,8 +92,7 @@ export function guideCursor(
   previous: number | null,
   undo = false,
 ): number | null {
-  for (let turn = lessonViewTurns(cube); turn > 0; turn--)
-    cube = applyMove(cube, { face: 'Y', turns: -1 });
+  cube = normalizeOrientation(cube);
   const preferred = previous === null ? -1 : previous + (undo ? -1 : 1);
   if (
     exercise.checkpoints[preferred] &&

@@ -5,8 +5,8 @@ import type { Face, Move, Vec3 } from '../../domain/cube/cube';
 import {
   COMMIT_PROGRESS,
   dragState,
+  planCubeDrag,
   planFaceDrag,
-  planYawDrag,
 } from './gesture';
 import type { DragPlan } from './gesture';
 import type { Action } from './session';
@@ -15,16 +15,19 @@ type Preview = { move: Move; progress: number };
 type Gesture = {
   pointerId: number;
   start: [number, number];
+  // Press point in SVG units, used to pick the face held from outside.
+  origin: [number, number];
   pixelsPerUnit: number;
   reverse: boolean;
   grab: { position: Vec3; normal: Vec3 } | null;
-  plan: DragPlan | null | 'ignored';
+  plan: DragPlan | null;
 };
 // Pixels before the drag direction (and thus the turning layer) is locked.
 const LOCK_DISTANCE = 8;
 
-// Press a sticker and drag to turn its layer; press outside the cube and drag
-// sideways to spin the whole cube. A release past half a turn commits through
+// Press a sticker and drag along the cube's rows or columns to turn that layer
+// (outer or middle); press outside the cube and drag along the nearest face's
+// grid to turn the whole cube. A release past half a turn commits through
 // the common input queue; otherwise the layer springs back unchanged.
 export function useCubeDrag({
   busy,
@@ -94,10 +97,17 @@ export function useCubeDrag({
       event.currentTarget.querySelector<SVGSVGElement>('svg[data-view]');
     if (!svg) return;
     const sticker = element.closest<SVGGElement>('[data-face]');
+    const matrix = svg.getScreenCTM();
+    const origin = matrix
+      ? new DOMPoint(event.clientX, event.clientY).matrixTransform(
+          matrix.inverse(),
+        )
+      : { x: 0, y: 0 };
     gesture.current = {
       pointerId: event.pointerId,
       start: [event.clientX, event.clientY],
-      pixelsPerUnit: svg.getScreenCTM()?.a || 1,
+      origin: [origin.x, origin.y],
+      pixelsPerUnit: matrix?.a || 1,
       reverse: svg.dataset.view === 'back',
       grab: sticker
         ? {
@@ -131,17 +141,16 @@ export function useCubeDrag({
     ];
     if (current.plan === null) {
       if (Math.hypot(...pixels) < LOCK_DISTANCE) return;
-      current.plan =
-        (current.grab
-          ? planFaceDrag(
-              current.grab.position,
-              current.grab.normal,
-              current.reverse,
-              delta,
-            )
-          : planYawDrag(current.reverse)) ?? 'ignored';
+      current.plan = current.grab
+        ? planFaceDrag(
+            current.grab.position,
+            current.grab.normal,
+            current.reverse,
+            delta,
+          )
+        : planCubeDrag(current.origin, current.reverse, delta);
     }
-    if (current.plan !== 'ignored') show(dragState(current.plan, delta));
+    show(dragState(current.plan, delta));
   };
 
   const onPointerEnd = (event: PointerEvent<HTMLElement>) => {
