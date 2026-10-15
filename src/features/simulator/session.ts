@@ -1,12 +1,14 @@
 import { applyMove, inverse, makePreset } from '../../domain/cube/cube.ts';
 import type { Cube, Move, Preset } from '../../domain/cube/cube.ts';
-import {
-  getExercise,
-  guideCursor,
-  lessonMove,
-  trainingStatus,
-} from '../../domain/f2l/lessons.ts';
+import { getExercise, trainingStatus } from '../../domain/f2l/lessons.ts';
 import type { LessonId, LessonSide } from '../../domain/f2l/lessons.ts';
+import {
+  getLastLayerExercise,
+  lastLayerStatus,
+} from '../../domain/last-layer/cases.ts';
+import type { LastLayerCaseId } from '../../domain/last-layer/cases.ts';
+import { guideCursor, lessonMove } from '../../domain/training/guide.ts';
+import type { GuidedExercise } from '../../domain/training/guide.ts';
 
 export type QueuedMove = { move: Move; undo?: boolean; backward?: boolean };
 export type Session = {
@@ -18,18 +20,25 @@ export type Session = {
   setup: Move[];
   message: string;
   initial: Cube;
-  lesson: {
-    side: LessonSide;
-    id: LessonId;
-    variant: number;
-    cursor: number | null;
-  } | null;
+  lesson: Lesson | null;
 };
+export type Lesson =
+  | {
+      kind: 'f2l';
+      side: LessonSide;
+      id: LessonId;
+      variant: number;
+      cursor: number | null;
+    }
+  | { kind: 'last-layer'; id: LastLayerCaseId; cursor: number | null };
+export type F2LLesson = Extract<Lesson, { kind: 'f2l' }>;
+export type LastLayerLesson = Extract<Lesson, { kind: 'last-layer' }>;
 export type Action =
   | { type: 'move'; move: Move }
   | { type: 'frame'; progress: number; command: QueuedMove }
   | { type: 'preset'; preset: Preset }
   | { type: 'lesson'; id: LessonId; variant?: number; side?: LessonSide }
+  | { type: 'last-layer'; id: LastLayerCaseId }
   | { type: 'seek'; cursor: number }
   | { type: 'guide'; wholeStage?: boolean }
   | { type: 'clear-history' }
@@ -51,6 +60,37 @@ export function createSession(preset: Preset = 'solved'): Session {
   };
 }
 
+export function lessonExercise(lesson: Lesson): GuidedExercise {
+  return lesson.kind === 'f2l'
+    ? getExercise(lesson.id, lesson.variant, lesson.side)
+    : getLastLayerExercise(lesson.id);
+}
+
+export function isLessonComplete(lesson: Lesson, cube: Cube): boolean {
+  return lesson.kind === 'f2l'
+    ? trainingStatus(cube, lesson.side) === 'paired'
+    : lastLayerStatus(cube, getLastLayerExercise(lesson.id).case.step) ===
+        'complete';
+}
+
+function startLesson(
+  exercise: GuidedExercise,
+  preset: Preset,
+  lesson: Lesson,
+): Session {
+  return {
+    cube: exercise.initial,
+    initial: exercise.initial,
+    setup: exercise.setup,
+    preset,
+    queue: [],
+    progress: 0,
+    history: [],
+    message: '',
+    lesson,
+  };
+}
+
 export function sessionReducer(state: Session, action: Action): Session {
   if (action.type === 'preset') return createSession(action.preset);
   if (action.type === 'lesson') {
@@ -59,23 +99,20 @@ export function sessionReducer(state: Session, action: Action): Session {
       action.variant ?? 0,
       action.side ?? 'right',
     );
-    return {
-      cube: exercise.initial,
-      initial: exercise.initial,
-      setup: exercise.setup,
-      preset: 'cross',
-      queue: [],
-      progress: 0,
-      history: [],
-      message: '',
-      lesson: {
-        side: exercise.side,
-        id: action.id,
-        variant: exercise.variant,
-        cursor: 0,
-      },
-    };
+    return startLesson(exercise, 'cross', {
+      kind: 'f2l',
+      side: exercise.side,
+      id: action.id,
+      variant: exercise.variant,
+      cursor: 0,
+    });
   }
+  if (action.type === 'last-layer')
+    return startLesson(getLastLayerExercise(action.id), 'f2l', {
+      kind: 'last-layer',
+      id: action.id,
+      cursor: 0,
+    });
   if (action.type === 'clear-history') {
     return {
       ...state,
@@ -100,11 +137,7 @@ export function sessionReducer(state: Session, action: Action): Session {
   if (action.type === 'seek') {
     if (state.queue.length || !state.lesson || state.lesson.cursor === null)
       return state;
-    const exercise = getExercise(
-      state.lesson.id,
-      state.lesson.variant,
-      state.lesson.side,
-    );
+    const exercise = lessonExercise(state.lesson);
     const from = state.lesson.cursor;
     const to = action.cursor;
     if (
@@ -134,18 +167,13 @@ export function sessionReducer(state: Session, action: Action): Session {
       state.queue.length ||
       !state.lesson ||
       state.lesson.cursor === null ||
-      trainingStatus(state.cube, state.lesson.side) === 'paired'
+      isLessonComplete(state.lesson, state.cube)
     )
       return state;
-    const exercise = getExercise(
-      state.lesson.id,
-      state.lesson.variant,
-      state.lesson.side,
-    );
+    const exercise = lessonExercise(state.lesson);
     const cursor = state.lesson.cursor;
-    const end = action.wholeStage
-      ? (exercise.stages.find((stage) => stage.end > cursor)?.end ?? cursor)
-      : cursor + 1;
+    // Every lesson guides a single stage: the whole printed algorithm.
+    const end = action.wholeStage ? exercise.solution.length : cursor + 1;
     return {
       ...state,
       queue: exercise.solution
@@ -183,11 +211,7 @@ export function sessionReducer(state: Session, action: Action): Session {
       ? {
           ...state.lesson,
           cursor: guideCursor(
-            getExercise(
-              state.lesson.id,
-              state.lesson.variant,
-              state.lesson.side,
-            ),
+            lessonExercise(state.lesson),
             cube,
             state.lesson.cursor,
             action.command.undo || action.command.backward,

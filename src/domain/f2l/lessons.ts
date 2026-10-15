@@ -1,15 +1,17 @@
 import {
-  applyMove,
   applyMoves,
   equal,
   centerColor,
   FACES,
-  FACE_COLORS,
   NORMALS,
   hasWhiteCross,
   solvedCube,
 } from '../cube/cube.ts';
 import type { Color, Cube, Move, Sticker } from '../cube/cube.ts';
+import { guideSteps, quarterTurns } from '../training/guide.ts';
+import type { SolutionToken } from '../training/guide.ts';
+
+export { guideCursor, lessonMove, lessonViewTurns } from '../training/guide.ts';
 
 export type LessonSide = 'right' | 'left';
 export type LessonId = 1 | 2 | 3 | 4 | 5;
@@ -148,20 +150,6 @@ const LEFT_HINTS: Record<LessonId, string[]> = {
   ],
 };
 
-// Quarter-turn checkpoints let two keyboard U presses follow an indicated U2.
-function moves(text: string): Move[] {
-  return text
-    .split(' ')
-    .filter(Boolean)
-    .flatMap((token): Move[] => {
-      const move: Move = {
-        face: token[0] as Move['face'],
-        turns: token.endsWith("'") ? -1 : 1,
-      };
-      return token.endsWith('2') ? [move, { ...move }] : [move];
-    });
-}
-
 const solved = solvedCube();
 export const CORNER_IDS = solved
   .filter((s) => equal(s.position, [1, -1, 1]))
@@ -242,7 +230,7 @@ export function areOtherSlotsSolved(
 
 export type Exercise = {
   side: LessonSide;
-  tokens: { label: string; start: number; end: number }[];
+  tokens: SolutionToken[];
   id: LessonId;
   variant: number;
   variantCount: number;
@@ -277,18 +265,12 @@ function buildExercise(
           pair: mirrorAlgorithm(original.pair),
           hint: LEFT_HINTS[id][variant],
         };
-  const setup = moves(definition.setup);
+  const setup = quarterTurns(definition.setup);
   const initial = applyMoves(solvedCube(), setup);
-  const solution = moves(definition.pair);
-  const checkpoints: Cube[] = [initial];
-  for (const move of solution)
-    checkpoints.push(applyMove(checkpoints.at(-1)!, move));
-  let offset = 0;
-  const tokens = definition.pair.split(' ').map((label) => {
-    const start = offset;
-    offset += label.endsWith('2') ? 2 : 1;
-    return { label, start, end: offset };
-  });
+  const { solution, checkpoints, tokens } = guideSteps(
+    initial,
+    definition.pair,
+  );
   return {
     side,
     tokens,
@@ -328,55 +310,6 @@ export function getExercise(
   return (side === 'left' ? MIRRORED_EXERCISES : EXERCISES).find(
     (exercise) => exercise.id === id && exercise.variant === variant,
   )!;
-}
-
-function sameCube(a: Cube, b: Cube): boolean {
-  return a.every(
-    (sticker, index) =>
-      sticker.id === b[index].id &&
-      equal(sticker.position, b[index].position) &&
-      equal(sticker.normal, b[index].normal),
-  );
-}
-
-// Centers encode the viewing yaw independently of history (which can be cleared).
-export function lessonViewTurns(cube: Cube): number {
-  return (['F', 'L', 'B', 'R'] as const).findIndex(
-    (face) => centerColor(cube, face) === 'red',
-  );
-}
-
-// Printed algorithms always use red-front / green-right coordinates. Only the
-// executed face changes when the learner views the same exercise from another side.
-export function lessonMove(cube: Cube, move: Move): Move {
-  if (move.face === 'Y') return move;
-  const color = FACE_COLORS[move.face];
-  return {
-    ...move,
-    face: FACES.find((face) => centerColor(cube, face) === color)!,
-  };
-}
-
-export function guideCursor(
-  exercise: Exercise,
-  cube: Cube,
-  previous: number | null,
-  undo = false,
-): number | null {
-  for (let turn = lessonViewTurns(cube); turn > 0; turn--)
-    cube = applyMove(cube, { face: 'Y', turns: -1 });
-  const preferred = previous === null ? -1 : previous + (undo ? -1 : 1);
-  if (
-    exercise.checkpoints[preferred] &&
-    sameCube(cube, exercise.checkpoints[preferred])
-  )
-    return preferred;
-  if (previous !== null && sameCube(cube, exercise.checkpoints[previous]))
-    return previous;
-  const found = exercise.checkpoints.findIndex((checkpoint) =>
-    sameCube(cube, checkpoint),
-  );
-  return found < 0 ? null : found;
 }
 
 export function trainingStatus(

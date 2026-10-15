@@ -1161,6 +1161,47 @@ footer > span {
 .variant-button {
   width: 100%;
 }
+.lesson-tools > :only-child {
+  margin-left: auto;
+}
+.case-group {
+  display: grid;
+  gap: 4px;
+}
+.case-group + .case-group {
+  margin-top: 6px;
+}
+.case-group-title {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #35694f;
+}
+.case-group-title span {
+  font-weight: 400;
+  color: #677860;
+}
+.lesson-panel .case-recognition {
+  margin-top: 8px;
+}
+.case-recognition strong {
+  margin-right: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #fff;
+  background: #6f8467;
+}
+.feedback-complete {
+  background: #deeedc;
+  color: #285633;
+  font-weight: 650;
+}
+.feedback-needs-auf {
+  background: #fff5e2;
+}
+.next-case-button {
+  width: 100%;
+}
 .hidden-guide-note {
   color: #697963;
 }

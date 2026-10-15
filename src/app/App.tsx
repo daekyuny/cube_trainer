@@ -13,7 +13,15 @@ import type { Face, Preset } from '../domain/cube/cube';
 import { CubeView } from '../features/simulator/CubeView';
 import { createSession, sessionReducer } from '../features/simulator/session';
 import { LessonPanel } from '../features/f2l/LessonPanel';
+import { LastLayerPanel } from '../features/last-layer/LastLayerPanel';
 import { targetIds, trainingStatus } from '../domain/f2l/lessons';
+import {
+  getLastLayerExercise,
+  LAST_LAYER_STEPS,
+  lastLayerSet,
+  lastLayerStatus,
+} from '../domain/last-layer/cases';
+import type { LastLayerCaseId } from '../domain/last-layer/cases';
 
 const presets: { id: Preset; title: string; subtitle: string }[] = [
   { id: 'solved', title: '맞춘 큐브', subtitle: '여섯 면이 모두 완성된 상태' },
@@ -33,6 +41,21 @@ const presets: { id: Preset; title: string; subtitle: string }[] = [
     subtitle: '흰색 아래 기준, 마지막 층부터 연습',
   },
 ];
+type Mode = 'free' | 'f2l' | 'oll' | 'pll';
+const modes: { id: Mode; title: string; note: string }[] = [
+  { id: 'free', title: '자유 연습', note: '프리셋에서 시작해 자유롭게' },
+  {
+    id: 'f2l',
+    title: 'F2L 페어링',
+    note: 'W 십자가 다음, 두 조각을 한 페어로',
+  },
+  { id: 'oll', title: '2-Look OLL', note: '1·2층 다음, 윗면을 두 번에 노랗게' },
+  { id: 'pll', title: '2-Look PLL', note: '윗면 노랑 다음, 위치를 두 번에' },
+];
+const firstCase: Record<'oll' | 'pll', LastLayerCaseId> = {
+  oll: 'oll-line',
+  pll: 'pll-t',
+};
 const faceNames: Record<Face, string> = {
   F: '앞',
   R: '오른쪽',
@@ -116,8 +139,19 @@ export function App() {
         ? '흰색 십자가 완성'
         : '자유롭게 연습 중';
   const activePreset = presets.find((preset) => preset.id === session.preset)!;
-  const pairStatus = session.lesson
-    ? trainingStatus(session.cube, session.lesson.side)
+  const lesson = session.lesson;
+  const mode: Mode = !lesson
+    ? 'free'
+    : lesson.kind === 'f2l'
+      ? 'f2l'
+      : lastLayerSet(lesson.id);
+  const activeMode = modes.find((item) => item.id === mode)!;
+  const pairStatus =
+    lesson?.kind === 'f2l' ? trainingStatus(session.cube, lesson.side) : null;
+  const lastLayerCase =
+    lesson?.kind === 'last-layer' ? getLastLayerExercise(lesson.id).case : null;
+  const caseStatus = lastLayerCase
+    ? lastLayerStatus(session.cube, lastLayerCase.step)
     : null;
   const stageStatus =
     pairStatus === 'paired'
@@ -126,7 +160,21 @@ export function App() {
         ? '페어 연결 · W 십자 복원 중'
         : pairStatus === 'slots-disturbed'
           ? '다른 세 슬롯 복원 필요'
-          : cubeStatus;
+          : caseStatus === 'complete' && lastLayerCase!.step !== 'pll-edges'
+            ? `${LAST_LAYER_STEPS.find((step) => step.id === lastLayerCase!.step)!.goal} 완성`
+            : caseStatus === 'needs-auf'
+              ? 'U 맞추기만 남음'
+              : caseStatus === 'f2l-open'
+                ? '공식 진행 중 · 1·2층 복원 전'
+                : cubeStatus;
+  const highlightIds =
+    lesson?.kind === 'f2l' && focus ? targetIds(lesson.side) : undefined;
+  const selectMode = (next: Mode) => {
+    if (next === mode) return;
+    if (next === 'free') dispatch({ type: 'preset', preset: 'solved' });
+    else if (next === 'f2l') dispatch({ type: 'lesson', id: 1 });
+    else dispatch({ type: 'last-layer', id: firstCase[next] });
+  };
   const facesLegend = (faces: Face[]) =>
     faces.map((face) => (
       <span key={face}>
@@ -148,7 +196,7 @@ export function App() {
           Cube Trainer
         </a>
         <span className="header-tag">
-          3 × 3 <span> / </span> {session.lesson ? 'F2L 페어링' : '자유 연습'}
+          3 × 3 <span> / </span> {activeMode.title}
         </span>
       </header>
       <main id="main">
@@ -162,24 +210,16 @@ export function App() {
           </span>
         </div>
         <nav className="practice-modes" aria-label="연습 모드">
-          <button
-            aria-pressed={!session.lesson}
-            onClick={() => {
-              if (session.lesson)
-                dispatch({ type: 'preset', preset: 'solved' });
-            }}
-          >
-            자유 연습
-          </button>
-          <button
-            aria-pressed={Boolean(session.lesson)}
-            onClick={() => {
-              if (!session.lesson) dispatch({ type: 'lesson', id: 1 });
-            }}
-          >
-            F2L 페어링
-          </button>
-          <span>W 십자가 다음, 두 조각을 한 페어로</span>
+          {modes.map((item) => (
+            <button
+              key={item.id}
+              aria-pressed={item.id === mode}
+              onClick={() => selectMode(item.id)}
+            >
+              {item.title}
+            </button>
+          ))}
+          <span>{activeMode.note}</span>
         </nav>
         <div className={`workspace${session.lesson ? ' is-training' : ''}`}>
           <section className="simulator" aria-label="큐브 연습 공간">
@@ -206,11 +246,7 @@ export function App() {
                   cube={session.cube}
                   move={command?.move}
                   progress={session.progress}
-                  highlightIds={
-                    session.lesson && focus
-                      ? targetIds(session.lesson.side)
-                      : undefined
-                  }
+                  highlightIds={highlightIds}
                 />
                 <div className="face-legend">
                   {facesLegend(['F', 'R', 'U'])}
@@ -226,11 +262,7 @@ export function App() {
                   reverse
                   move={command?.move}
                   progress={session.progress}
-                  highlightIds={
-                    session.lesson && focus
-                      ? targetIds(session.lesson.side)
-                      : undefined
-                  }
+                  highlightIds={highlightIds}
                 />
                 <div className="face-legend">
                   {facesLegend(['B', 'L', 'D'])}
@@ -238,9 +270,11 @@ export function App() {
               </figure>
             </div>
             <div className="stage-caption">
-              {session.lesson
-                ? `R·${session.lesson.side === 'left' ? 'B' : 'G'}·W 코너 · R·${session.lesson.side === 'left' ? 'B' : 'G'} 엣지 / 두 그림은 같은 큐브입니다.`
-                : '같은 큐브의 여섯 면을 함께 보고 있어요.'}
+              {lesson?.kind === 'f2l'
+                ? `R·${lesson.side === 'left' ? 'B' : 'G'}·W 코너 · R·${lesson.side === 'left' ? 'B' : 'G'} 엣지 / 두 그림은 같은 큐브입니다.`
+                : lesson
+                  ? `${mode === 'oll' ? '윗면의 노란 스티커' : '윗층 옆면의 색'}로 케이스를 찾아보세요 / 두 그림은 같은 큐브입니다.`
+                  : '같은 큐브의 여섯 면을 함께 보고 있어요.'}
             </div>
             <div className="yaw-controls">
               <button
@@ -314,12 +348,20 @@ export function App() {
             </div>
           </section>
           <aside className="control-panel" aria-label="연습 컨트롤">
-            {session.lesson && (
+            {lesson?.kind === 'f2l' && (
               <LessonPanel
                 session={session}
+                lesson={lesson}
                 dispatch={dispatch}
                 focus={focus}
                 onFocusChange={setFocus}
+              />
+            )}
+            {lesson?.kind === 'last-layer' && (
+              <LastLayerPanel
+                session={session}
+                lesson={lesson}
+                dispatch={dispatch}
               />
             )}
             <section className="turn-panel">
@@ -436,9 +478,11 @@ export function App() {
           <div>
             <p>
               <strong>
-                {session.lesson
-                  ? `F2L ${session.lesson.id}번 유형`
-                  : activePreset.title}
+                {lesson?.kind === 'f2l'
+                  ? `F2L ${lesson.id}번 유형`
+                  : lastLayerCase
+                    ? `${mode.toUpperCase()} ${lastLayerCase.name} 케이스`
+                    : activePreset.title}
               </strong>
               에서 시작했습니다. 큰 그림의 F/R/U와 작은 그림의 B/L/D는 언제나
               같은 큐브를 보여 줍니다. 작은 그림은 뒤집어 본 모습이므로 D(흰색
@@ -448,7 +492,16 @@ export function App() {
               수순 리셋은 현재 큐브를 유지하고 기록과 대기 입력만 비웁니다. 시작
               상태로 되돌리기와 같은 배치 다시는 큐브도 처음 배치로 복원합니다.
             </p>
-            {session.lesson && (
+            {lesson?.kind === 'last-layer' && (
+              <p>
+                2-Look OLL은 엣지 방향(노란 십자) → 코너 방향(윗면 노랑), 2-Look
+                PLL은 코너 위치(헤드라이트) → 엣지 위치(완성) 순서로 연습합니다.
+                넓은 회전·중간층 없이 바깥 면만 돌리는 공식을 사용하며, 각
+                케이스는 공식을 바로 적용하는 각도로 시작합니다. 단계를 마치면
+                이어지는 다음 단계 케이스로 넘어갈 수 있습니다.
+              </p>
+            )}
+            {lesson?.kind === 'f2l' && (
               <p>
                 초보 1·2·3층 풀이와 십자가 만들기는 건너뜁니다. F2L은 준비된 두
                 조각의 페어링부터 연습합니다.{' '}
