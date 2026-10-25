@@ -182,10 +182,10 @@ figure {
   min-width: 0;
 }
 .primary-cube {
-  width: 57%;
+  width: 55%;
 }
 .secondary-cube {
-  width: 43%;
+  width: 45%;
   padding-top: 12px;
 }
 .cube-svg {
@@ -193,6 +193,57 @@ figure {
   width: 100%;
   height: auto;
   overflow: visible;
+}
+.circle-svg .ring {
+  fill: none;
+  stroke: #d3dccf;
+  stroke-width: 1.5;
+  transition:
+    stroke 120ms,
+    opacity 120ms;
+}
+.circle-svg .ring.is-idle {
+  opacity: 0.55;
+}
+/* The turning layer's ring: a wide halo under a thick dark stroke. */
+.circle-svg .ring.is-active {
+  stroke: #35694f;
+  stroke-width: 4.5;
+  filter: drop-shadow(0 0 3px #35694f80);
+}
+.circle-svg .ring-arrow {
+  fill: none;
+  stroke: #35694f;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.circle-svg .circle-arrow-head {
+  fill: #35694f;
+}
+.circle-svg .sticker-dot {
+  stroke: #26352f;
+  stroke-width: 1.6;
+}
+.circle-svg .sticker-dot.is-target {
+  stroke-width: 3.6;
+}
+/* In lessons the targets stand out; the rest stay visible but faint. */
+.circle-svg .sticker-dot.is-muted {
+  opacity: 0.3;
+}
+.circle-svg .circle-face-label {
+  font-size: 14px;
+  font-weight: 700;
+  fill: #9aa79a;
+}
+.circle-svg .circle-move {
+  font-size: 30px;
+  font-weight: 800;
+  fill: #b7c2b5;
+  font-variant-numeric: tabular-nums;
+}
+.circle-svg .circle-move.is-active {
+  fill: #35694f;
 }
 figcaption {
   padding-left: 22px;
@@ -340,8 +391,7 @@ h2 {
   display: grid;
   gap: 10px;
 }
-.turn-panel,
-.preset-panel {
+.turn-panel {
   background: #fff;
   border: 1px solid #e0e5da;
   border-radius: 10px;
@@ -513,54 +563,6 @@ kbd {
   text-align: center;
   margin: 0;
 }
-.preset-list {
-  display: grid;
-  gap: 7px;
-  margin-top: 8px;
-}
-.preset-button {
-  display: flex;
-  align-items: center;
-  text-align: left;
-  gap: 11px;
-  min-height: 52px;
-  padding: 6px 8px;
-  border: 1px solid #e5e9df;
-  border-radius: 9px;
-  background: #fff;
-}
-.preset-button.selected {
-  border-color: #9bb293;
-  background: #f1f6ec;
-}
-.preset-index {
-  font-size: 10px;
-  color: #9ba88f;
-}
-.preset-button strong {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-}
-.preset-button small {
-  display: block;
-  font-size: 9px;
-  color: #8a9681;
-  margin-top: 5px;
-  line-height: 1.5;
-  word-break: keep-all;
-}
-.preset-arrow {
-  margin-left: auto;
-  font-size: 14px;
-  color: #7d9171;
-}
-.preset-note {
-  font-size: 9px;
-  color: #97a08d;
-  line-height: 1.6;
-  margin: 12px 0 0;
-}
 .help-panel {
   margin-top: 10px;
   border-top: 1px solid #e1e6da;
@@ -615,8 +617,7 @@ footer > span {
     grid-template-columns: minmax(0, 1fr) 290px;
     gap: 10px;
   }
-  .turn-panel,
-  .preset-panel {
+  .turn-panel {
     padding: 10px;
   }
   .cube-stage {
@@ -762,8 +763,7 @@ footer > span {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
-  .turn-panel,
-  .preset-panel {
+  .turn-panel {
     padding: 10px;
   }
   .panel-heading > span {
@@ -779,25 +779,6 @@ footer > span {
   }
   .panel-heading h2 {
     font-size: 13px;
-  }
-  .preset-button {
-    padding: 10px 7px;
-    gap: 7px;
-  }
-  .preset-index {
-    display: none;
-  }
-  .preset-button small {
-    font-size: 9px;
-  }
-  .preset-button strong {
-    font-size: 11px;
-  }
-  .preset-arrow {
-    font-size: 12px;
-  }
-  .preset-note {
-    font-size: 9px;
   }
   .keyboard-hint {
     display: none;
@@ -833,18 +814,6 @@ footer > span {
   .direction-switch {
     max-width: 260px;
     margin: auto;
-  }
-  .preset-list {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .preset-button {
-    min-height: 56px;
-    padding: 8px;
-    gap: 4px;
-  }
-  .preset-panel {
-    padding: 10px;
   }
   .queue-status {
     margin: 0;
@@ -922,6 +891,43 @@ footer > span {
   color: #fff;
   background: #35694f;
   border-color: #35694f;
+}
+/* Five random-practice stages: F2L on its own row, then OLL and PLL pairs. */
+.practice-stages {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 6px 0;
+}
+.practice-stages button {
+  display: grid;
+  gap: 1px;
+  min-height: 44px;
+  padding: 4px 8px;
+  text-align: left;
+  border: 1px solid #d5dfd0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+}
+.practice-stages button:first-child {
+  grid-column: 1 / -1;
+}
+.practice-stages button span {
+  font-size: 10px;
+  color: #677860;
+}
+.practice-stages button[aria-pressed='true'] {
+  color: #fff;
+  background: #35694f;
+  border-color: #35694f;
+}
+.practice-stages button[aria-pressed='true'] span {
+  color: #dfeadb;
+}
+.practice-body {
+  display: grid;
+  gap: 4px;
 }
 .practice-modes > span {
   font-size: 11px;
@@ -1302,16 +1308,18 @@ footer > span {
     display: none;
   }
 }
-/* Drag gestures: horizontal drags spin the cube, vertical swipes outside the
-   cube still scroll the page; on the cube itself every direction turns a layer. */
+/* Drag gestures (main cube only): vertical swipes outside the cube still
+   scroll the page; on the cube itself every direction turns a layer. */
 .cube-stage {
-  touch-action: pan-y;
-  cursor: grab;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-.cube-stage .cube-svg {
+.primary-cube {
+  touch-action: pan-y;
+  cursor: grab;
+}
+.primary-cube .cube-svg {
   touch-action: none;
 }
 .cube-stage [data-face] {

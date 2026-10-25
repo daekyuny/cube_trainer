@@ -12,12 +12,15 @@ import {
   isSolved,
   notation,
 } from '../domain/cube/cube';
-import type { Face, Move, Preset } from '../domain/cube/cube';
+import type { Face, Move } from '../domain/cube/cube';
+import { CircleView } from '../features/simulator/CircleView';
 import { CubeView } from '../features/simulator/CubeView';
 import { createSession, sessionReducer } from '../features/simulator/session';
 import { useCubeDrag } from '../features/simulator/useCubeDrag';
 import { LessonPanel } from '../features/f2l/LessonPanel';
 import { LastLayerPanel } from '../features/last-layer/LastLayerPanel';
+import { PracticePanel } from '../features/practice/PracticePanel';
+import { PRACTICE_STAGES } from '../domain/practice/practice';
 import { targetIds, trainingStatus } from '../domain/f2l/lessons';
 import {
   getLastLayerExercise,
@@ -27,27 +30,13 @@ import {
 } from '../domain/last-layer/cases';
 import type { LastLayerCaseId } from '../domain/last-layer/cases';
 
-const presets: { id: Preset; title: string; subtitle: string }[] = [
-  { id: 'solved', title: '맞춘 큐브', subtitle: '여섯 면이 모두 완성된 상태' },
-  {
-    id: 'random',
-    title: '랜덤 섞기',
-    subtitle: '실제 회전 25수로 골고루 섞기',
-  },
-  {
-    id: 'cross',
-    title: '흰색 십자가',
-    subtitle: '흰색 엣지와 옆면 센터까지 정렬',
-  },
-  {
-    id: 'f2l',
-    title: '1·2층 완성',
-    subtitle: '흰색 아래 기준, 마지막 층부터 연습',
-  },
-];
-type Mode = 'free' | 'f2l' | 'oll' | 'pll';
+type Mode = 'practice' | 'f2l' | 'oll' | 'pll';
 const modes: { id: Mode; title: string; note: string }[] = [
-  { id: 'free', title: '자유 연습', note: '프리셋에서 시작해 자유롭게' },
+  {
+    id: 'practice',
+    title: '단계별 연습',
+    note: '다섯 단계를 무작위 배치로',
+  },
   {
     id: 'f2l',
     title: 'F2L 페어링',
@@ -172,20 +161,30 @@ export function App() {
       : hasWhiteCross(session.cube)
         ? '흰색 십자가 완성'
         : '자유롭게 연습 중';
-  const activePreset = presets.find((preset) => preset.id === session.preset)!;
   const lesson = session.lesson;
-  const mode: Mode = !lesson
-    ? 'free'
-    : lesson.kind === 'f2l'
-      ? 'f2l'
-      : lastLayerSet(lesson.id);
+  const mode: Mode =
+    !lesson || lesson.kind === 'practice'
+      ? 'practice'
+      : lesson.kind === 'f2l'
+        ? 'f2l'
+        : lastLayerSet(lesson.id);
   const activeMode = modes.find((item) => item.id === mode)!;
-  const pairStatus =
-    lesson?.kind === 'f2l' ? trainingStatus(session.cube, lesson.side) : null;
+  const practice = lesson?.kind === 'practice' ? lesson.exercise : null;
+  // Which F2L pair or last-layer step the current lesson or practice is on.
+  const f2lSide =
+    lesson?.kind === 'f2l'
+      ? lesson.side
+      : practice?.stage === 'f2l'
+        ? practice.side!
+        : null;
   const lastLayerCase =
     lesson?.kind === 'last-layer' ? getLastLayerExercise(lesson.id).case : null;
-  const caseStatus = lastLayerCase
-    ? lastLayerStatus(session.cube, lastLayerCase.step)
+  const lastLayerStep =
+    lastLayerCase?.step ??
+    (practice && practice.stage !== 'f2l' ? practice.stage : null);
+  const pairStatus = f2lSide ? trainingStatus(session.cube, f2lSide) : null;
+  const caseStatus = lastLayerStep
+    ? lastLayerStatus(session.cube, lastLayerStep)
     : null;
   const stageStatus =
     pairStatus === 'paired'
@@ -194,18 +193,19 @@ export function App() {
         ? '페어 연결 · W 십자 복원 중'
         : pairStatus === 'slots-disturbed'
           ? '다른 세 슬롯 복원 필요'
-          : caseStatus === 'complete' && lastLayerCase!.step !== 'pll-edges'
-            ? `${LAST_LAYER_STEPS.find((step) => step.id === lastLayerCase!.step)!.goal} 완성`
+          : caseStatus === 'complete' && lastLayerStep !== 'pll-edges'
+            ? `${LAST_LAYER_STEPS.find((step) => step.id === lastLayerStep)!.goal} 완성`
             : caseStatus === 'needs-auf'
               ? 'U 맞추기만 남음'
               : caseStatus === 'f2l-open'
                 ? '공식 진행 중 · 1·2층 복원 전'
                 : cubeStatus;
+  // Practice always marks its pair: the side is random.
   const highlightIds =
-    lesson?.kind === 'f2l' && focus ? targetIds(lesson.side) : undefined;
+    f2lSide && (focus || practice) ? targetIds(f2lSide) : undefined;
   const selectMode = (next: Mode) => {
     if (next === mode) return;
-    if (next === 'free') dispatch({ type: 'preset', preset: 'solved' });
+    if (next === 'practice') dispatch({ type: 'preset', preset: 'solved' });
     else if (next === 'f2l') dispatch({ type: 'lesson', id: 1 });
     else dispatch({ type: 'last-layer', id: firstCase[next] });
   };
@@ -256,7 +256,7 @@ export function App() {
           ))}
           <span>{activeMode.note}</span>
         </nav>
-        <div className={`workspace${session.lesson ? ' is-training' : ''}`}>
+        <div className="workspace is-training">
           <section className="simulator" aria-label="큐브 연습 공간">
             <div className="stage-toolbar">
               <span className="live-badge">
@@ -272,9 +272,8 @@ export function App() {
               data-testid="cube-stage"
               data-busy={Boolean(command)}
               data-dragging={Boolean(drag.preview)}
-              {...drag.handlers}
             >
-              <figure className="primary-cube">
+              <figure className="primary-cube" {...drag.handlers}>
                 <figcaption>
                   <span className="view-number">01</span> 기준 큐브{' '}
                   <span className="view-hint">앞 · 오른쪽 · 위</span>
@@ -291,27 +290,24 @@ export function App() {
               </figure>
               <figure className="secondary-cube">
                 <figcaption>
-                  <span className="view-number">02</span> 뒤집어 보기{' '}
-                  <span className="view-hint">뒤 · 왼쪽 · 아래</span>
+                  <span className="view-number">02</span> 원 그래프{' '}
+                  <span className="view-hint">층마다 원 하나</span>
                 </figcaption>
-                <CubeView
+                <CircleView
                   cube={session.cube}
-                  reverse
                   move={shownMove}
                   progress={shownProgress}
+                  lastMove={session.history.at(-1)}
                   highlightIds={highlightIds}
                 />
-                <div className="face-legend">
-                  {facesLegend(['B', 'L', 'D'])}
-                </div>
               </figure>
             </div>
             <div className="stage-caption">
-              {lesson?.kind === 'f2l'
-                ? `R·${lesson.side === 'left' ? 'B' : 'G'}·W 코너 · R·${lesson.side === 'left' ? 'B' : 'G'} 엣지 / 두 그림은 같은 큐브입니다.`
-                : lesson
-                  ? `${mode === 'oll' ? '윗면의 노란 스티커' : '윗층 옆면의 색'}로 케이스를 찾아보세요 / 두 그림은 같은 큐브입니다.`
-                  : '같은 큐브의 여섯 면을 함께 보고 있어요.'}
+              {f2lSide
+                ? `R·${f2lSide === 'left' ? 'B' : 'G'}·W 코너 · R·${f2lSide === 'left' ? 'B' : 'G'} 엣지 / 두 그림은 같은 큐브입니다.`
+                : lastLayerStep
+                  ? `${lastLayerStep.startsWith('oll') ? '윗면의 노란 스티커' : '윗층 옆면의 색'}로 케이스를 찾아보세요 / 두 그림은 같은 큐브입니다.`
+                  : '연습할 단계를 고르세요 / 두 그림은 같은 큐브입니다.'}
             </div>
             <div className="yaw-controls">
               <button
@@ -392,6 +388,13 @@ export function App() {
                 dispatch={dispatch}
                 focus={focus}
                 onFocusChange={setFocus}
+              />
+            )}
+            {mode === 'practice' && (
+              <PracticePanel
+                session={session}
+                lesson={lesson?.kind === 'practice' ? lesson : null}
+                dispatch={dispatch}
               />
             )}
             {lesson?.kind === 'last-layer' && (
@@ -498,44 +501,6 @@ export function App() {
                     : '\u00a0')}
               </p>
             </section>
-            {!session.lesson && (
-              <section className="preset-panel">
-                <div className="panel-heading">
-                  <h2>어디서 시작할까요?</h2>
-                  <span>PRESETS</span>
-                </div>
-                <div className="preset-list">
-                  {presets.map((preset, index) => (
-                    <button
-                      key={preset.id}
-                      className={`preset-button ${session.preset === preset.id ? 'selected' : ''}`}
-                      onClick={() =>
-                        dispatch({ type: 'preset', preset: preset.id })
-                      }
-                      aria-label={`${preset.title} 프리셋 적용`}
-                    >
-                      <span className="preset-index">0{index + 1}</span>
-                      <span>
-                        <strong>{preset.title}</strong>
-                        <small>{preset.subtitle}</small>
-                      </span>
-                      <span className="preset-arrow" aria-hidden="true">
-                        ↗
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <p className="preset-note">
-                  누르면 해당 상태로 새로 시작하고 수순을 비웁니다.
-                </p>
-                <button
-                  className="secondary-button"
-                  onClick={() => dispatch({ type: 'restart' })}
-                >
-                  현재 시작 상태로 되돌리기
-                </button>
-              </section>
-            )}
           </aside>
         </div>
         <details className="help-panel">
@@ -547,11 +512,15 @@ export function App() {
                   ? `F2L ${lesson.id}번 유형`
                   : lastLayerCase
                     ? `${mode.toUpperCase()} ${lastLayerCase.name} 케이스`
-                    : activePreset.title}
+                    : practice
+                      ? `단계별 연습 · ${PRACTICE_STAGES.find((stage) => stage.id === practice.stage)!.title} 랜덤 배치`
+                      : '맞춘 큐브'}
               </strong>
-              에서 시작했습니다. 큰 그림의 F/R/U와 작은 그림의 B/L/D는 언제나
-              같은 큐브를 보여 줍니다. 작은 그림은 뒤집어 본 모습이므로 D(흰색
-              센터)가 위에 보입니다.
+              에서 시작했습니다. 큐브 그림과 오른쪽 원 그래프는 언제나 같은
+              큐브를 보여 줍니다. 원 그래프는 여섯 면의 스티커를 점으로 펼친
+              것으로, 안쪽 세 묶음이 보이는 U/F/R, 바깥 세 묶음이 B/L/D입니다.
+              한 층을 돌리면 그 층의 원이 굵게 표시되고 점들이 원을 따라
+              움직입니다. 조작은 큐브 그림에서 합니다.
             </p>
             <p>
               수순 리셋은 현재 큐브를 유지하고 기록과 대기 입력만 비웁니다. 시작
@@ -566,6 +535,16 @@ export function App() {
                 줄(f)·가운데 줄(M)·큐브 전체(x) 회전으로 외울 양을 줄였습니다.
                 각 케이스는 공식을 바로 적용하는 각도로 시작하며, 단계를 마치면
                 이어지는 다음 단계 케이스로 넘어갈 수 있습니다.
+              </p>
+            )}
+            {mode === 'practice' && (
+              <p>
+                단계별 연습은 F2L 페어링, OLL 1·2단계, PLL 1·2단계 중 하나를
+                골라 그 단계를 무작위 배치로 연습합니다. 앞 단계까지는 맞춘
+                상태이고, 윗층은 2-Look 공식을 무작위로 섞어 실제 회전으로
+                만듭니다. F2L은 배운 다섯 유형과 좌우 대칭 중에서 나옵니다.
+                풀이는 처음에 숨겨져 있고, 풀이 보기를 누르면 케이스 이름과 U
+                맞추기를 포함한 공식·시연이 나타납니다.
               </p>
             )}
             {lesson?.kind === 'f2l' && (
@@ -592,8 +571,7 @@ export function App() {
             </p>
             <p>
               문자 키는 시계 방향, Shift + 문자 키는 반시계 방향입니다. 화면의
-              방향 선택은 화면 버튼에 적용됩니다. 랜덤 섞기는 합법적인 회전으로
-              생성하며 대회용 무작위 상태 생성기는 아닙니다.
+              방향 선택은 화면 버튼에 적용됩니다.
             </p>
             {session.setup.length > 0 && (
               <p className="setup-sequence">

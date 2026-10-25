@@ -31,7 +31,7 @@ test('assets load under the site base and reloading preserves a usable app', asy
     expect(url.pathname.startsWith(site.pathname)).toBe(true);
   }
   await page.reload();
-  await expect(page.getByTestId('cube-back')).toBeVisible();
+  await expect(page.getByTestId('cube-circles')).toBeVisible();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('cube-front')).toHaveAttribute(
     'aria-label',

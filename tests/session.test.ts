@@ -184,7 +184,8 @@ test('F2L-04: demonstration, manual input, reset, undo and lesson switches share
     progress: 1,
   });
   assert.equal(session, changed);
-  assert.equal(session.lesson!.id, 4);
+  const lesson = session.lesson!;
+  assert.ok(lesson.kind === 'f2l' && lesson.id === 4);
   assert.equal(session.history.length, 0);
 });
 

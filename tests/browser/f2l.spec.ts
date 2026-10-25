@@ -1,4 +1,17 @@
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+const cubeLabels = (page: Page) =>
+  page.getByTestId('cube-front').locator('text');
+const graphTargets = (page: Page) =>
+  page.getByTestId('cube-circles').locator('.sticker-dot.is-target');
+// Both pictures, minus the graph's last-move symbol (it follows the history).
+const stageSnapshot = (page: Page) =>
+  page.locator('.cube-stage').evaluate((stage) => {
+    const copy = stage.cloneNode(true) as Element;
+    copy.querySelector('[data-testid="circle-move"]')?.remove();
+    return copy.innerHTML;
+  });
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -107,13 +120,15 @@ test('F2L-04/07: manual pairing, cross restoration, undo and history reset', asy
   );
 });
 
-test('F2L-02/08: only case 5 changes edge orientation; both views show color labels without face letters', async ({
+test('F2L-02/08: only case 5 changes edge orientation; the cube shows color labels without face letters, the graph rings its targets', async ({
   page,
 }) => {
   const verifyLabels = async () => {
-    const texts = await page.locator('.cube-svg text').allTextContents();
+    const texts = await cubeLabels(page).allTextContents();
     expect(texts.length).toBeGreaterThan(0);
     for (const text of texts) expect(text).toMatch(/^[YWROBG]$/);
+    // The graph shows hidden stickers too: the corner's three and edge's two.
+    await expect(graphTargets(page)).toHaveCount(5);
   };
   for (let index = 0; index < 5; index++) {
     await page.locator('.case-select').nth(index).click();
@@ -138,9 +153,11 @@ test('F2L-02/08: only case 5 changes edge orientation; both views show color lab
   );
   await verifyLabels();
   await page.getByLabel('대상 조각 강조').uncheck();
-  await expect(page.locator('.cube-svg text')).toHaveCount(0);
-  await page.getByRole('button', { name: '자유 연습', exact: true }).click();
-  await expect(page.locator('.cube-svg text')).toHaveCount(0);
+  await expect(cubeLabels(page)).toHaveCount(0);
+  await expect(graphTargets(page)).toHaveCount(0);
+  await page.getByRole('button', { name: '단계별 연습', exact: true }).click();
+  await expect(cubeLabels(page)).toHaveCount(0);
+  await expect(graphTargets(page)).toHaveCount(0);
 });
 
 test('F2L-09: a pair that breaks another slot is not accepted; corrected demonstration preserves it', async ({
@@ -206,7 +223,7 @@ test('SESSION-03/04: reset and restart cancel animation, and switching modes can
     'true',
   );
   await page.getByRole('button', { name: '전체 시연' }).click();
-  await page.getByRole('button', { name: '자유 연습', exact: true }).click();
+  await page.getByRole('button', { name: '단계별 연습', exact: true }).click();
   await expect(page.locator('.live-badge')).toHaveText('여섯 면 완성');
   await expect(page.getByTestId('cube-stage')).toHaveAttribute(
     'data-busy',
@@ -235,7 +252,7 @@ for (const viewport of [
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    for (const id of ['cube-front', 'cube-back']) {
+    for (const id of ['cube-front', 'cube-circles']) {
       const box = (await page.getByTestId(id).boundingBox())!;
       expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
@@ -254,7 +271,7 @@ for (const viewport of [
       'false',
     );
     await expect(page.getByLabel('회전 이력')).toHaveText('R');
-    for (const id of ['cube-front', 'cube-back']) {
+    for (const id of ['cube-front', 'cube-circles']) {
       const box = (await page.getByTestId(id).boundingBox())!;
       expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
@@ -280,7 +297,7 @@ test('F2L-10/11: inline accordion, mirrors, reversible letter navigation and hid
     await expect(page.locator('.lesson-observation')).toContainText(
       'W·R·B / R·B 슬롯 바로 위 · 앞·왼쪽 위',
     );
-    const initial = await page.locator('.cube-stage').innerHTML();
+    const initial = await stageSnapshot(page);
     const letters = page.locator('.solution-token');
     await letters.last().click();
     await expect(page.getByTestId('lesson-status')).toHaveAttribute(
@@ -299,11 +316,11 @@ test('F2L-10/11: inline accordion, mirrors, reversible letter navigation and hid
       'data-busy',
       'false',
     );
-    expect(await page.locator('.cube-stage').innerHTML()).toEqual(initial);
+    expect(await stageSnapshot(page)).toEqual(initial);
     await page.getByRole('button', { name: '풀이 숨김', exact: true }).click();
     await expect(letters).toHaveCount(0);
     await expect(page.getByTestId('stage-pair')).toHaveCount(0);
-    expect(await page.locator('.cube-stage').innerHTML()).toEqual(initial);
+    expect(await stageSnapshot(page)).toEqual(initial);
     await page.getByRole('button', { name: '풀이 보기', exact: true }).click();
   }
   // U2 is one selectable letter even though manual input uses quarter turns.
@@ -400,7 +417,7 @@ test('F2L-12: view a solution from the back, reverse it, and keep original notat
     'data-busy',
     'false',
   );
-  const initial = await page.locator('.cube-stage').innerHTML();
+  const initial = await stageSnapshot(page);
   await expect(
     page.getByRole('button', { name: '다음 · R', exact: true }),
   ).toBeEnabled();
@@ -423,7 +440,7 @@ test('F2L-12: view a solution from the back, reverse it, and keep original notat
     'data-busy',
     'false',
   );
-  expect(await page.locator('.cube-stage').innerHTML()).toEqual(initial);
+  expect(await stageSnapshot(page)).toEqual(initial);
   await page.locator('.solution-token').first().click();
   await page
     .getByRole('button', { name: '큐브 전체 왼쪽으로 90도 회전', exact: true })

@@ -1,14 +1,9 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 
-const sticker = (
-  page: Page,
-  view: 'front' | 'back',
-  position: string,
-  face: string,
-) =>
+const sticker = (page: Page, position: string, face: string) =>
   page
-    .getByTestId(`cube-${view}`)
+    .getByTestId('cube-front')
     .locator(`[data-position="${position}"][data-face="${face}"]`);
 
 async function center(locator: Locator) {
@@ -50,7 +45,7 @@ test('DRAG-06: dragging a sticker past half a turn commits; a short drag springs
   page,
 }) => {
   const before = await page.getByTestId('cube-front').innerHTML();
-  const grab = await center(sticker(page, 'front', '1,0,1', 'F'));
+  const grab = await center(sticker(page, '1,0,1', 'F'));
   await drag(page, grab, 0, -40);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toContainText('첫 회전');
@@ -59,20 +54,15 @@ test('DRAG-06: dragging a sticker past half a turn commits; a short drag springs
   await drag(page, grab, 0, -260);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('R');
-  await drag(page, await center(sticker(page, 'front', '0,1,1', 'U')), 260, 0);
+  await drag(page, await center(sticker(page, '0,1,1', 'U')), 260, 0);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('RF');
-  // The flipped view turns D from its top (white) row.
-  await drag(
-    page,
-    await center(sticker(page, 'back', '0,-1,-1', 'B')),
-    -200,
-    0,
-  );
+  // The front face's bottom row sideways = D.
+  await drag(page, await center(sticker(page, '0,-1,1', 'F')), 260, 0);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('RFD');
   // Middle row sideways = E, middle column up = M′.
-  const middle = await center(sticker(page, 'front', '0,0,1', 'F'));
+  const middle = await center(sticker(page, '0,0,1', 'F'));
   await drag(page, middle, 260, 0);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('RFDE');
@@ -121,7 +111,7 @@ test('DRAG-07: dragging outside the cube along the nearest face grid turns the w
   await expect(page.getByLabel('회전 이력')).toHaveText('←→xz');
   await expect(page.locator('.move-count')).toHaveText('0 moves');
   // A sticker drag follows the cube as it is now shown.
-  await drag(page, await center(sticker(page, 'front', '1,0,1', 'F')), 0, -260);
+  await drag(page, await center(sticker(page, '1,0,1', 'F')), 0, -260);
   await idle(page);
   await expect(page.getByLabel('회전 이력')).toHaveText('←→xzR');
   await expect(page.locator('.live-badge')).toHaveText('자유롭게 연습 중');
@@ -165,7 +155,7 @@ test('DRAG-08: a drag in a lesson follows the guide like a key press', async ({
   page,
 }) => {
   await page.getByRole('button', { name: 'F2L 페어링', exact: true }).click();
-  const grab = await center(sticker(page, 'front', '1,0,1', 'F'));
+  const grab = await center(sticker(page, '1,0,1', 'F'));
   await drag(page, grab, 0, -260);
   await idle(page);
   await expect(
@@ -189,7 +179,7 @@ test('DRAG-09: touch drag on a 390px screen turns a layer without scrolling', as
   const page = await context.newPage();
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
-  const grab = await center(sticker(page, 'front', '1,0,1', 'F'));
+  const grab = await center(sticker(page, '1,0,1', 'F'));
   const cdp = await context.newCDPSession(page);
   const touch = (type: string, x: number, y: number) =>
     cdp.send('Input.dispatchTouchEvent', {

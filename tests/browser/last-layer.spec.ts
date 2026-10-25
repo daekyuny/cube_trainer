@@ -193,7 +193,7 @@ for (const viewport of [
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
-      for (const id of ['cube-front', 'cube-back']) {
+      for (const id of ['cube-front', 'cube-circles']) {
         const box = (await page.getByTestId(id).boundingBox())!;
         expect(box.y).toBeGreaterThanOrEqual(0);
         expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);

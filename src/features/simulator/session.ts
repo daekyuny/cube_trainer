@@ -7,6 +7,8 @@ import {
   lastLayerStatus,
 } from '../../domain/last-layer/cases.ts';
 import type { LastLayerCaseId } from '../../domain/last-layer/cases.ts';
+import { isPracticeComplete } from '../../domain/practice/practice.ts';
+import type { PracticeExercise } from '../../domain/practice/practice.ts';
 import { guideCursor, lessonMove } from '../../domain/training/guide.ts';
 import type { GuidedExercise } from '../../domain/training/guide.ts';
 
@@ -36,15 +38,20 @@ export type Lesson =
       variant: number;
       cursor: number | null;
     }
-  | { kind: 'last-layer'; id: LastLayerCaseId; cursor: number | null };
+  | { kind: 'last-layer'; id: LastLayerCaseId; cursor: number | null }
+  // A generated random start: the exercise itself is kept, not an id.
+  | { kind: 'practice'; exercise: PracticeExercise; cursor: number | null };
 export type F2LLesson = Extract<Lesson, { kind: 'f2l' }>;
 export type LastLayerLesson = Extract<Lesson, { kind: 'last-layer' }>;
+export type PracticeLesson = Extract<Lesson, { kind: 'practice' }>;
 export type Action =
   | { type: 'move'; move: Move; from?: number }
   | { type: 'frame'; progress: number; command: QueuedMove }
   | { type: 'preset'; preset: Preset }
   | { type: 'lesson'; id: LessonId; variant?: number; side?: LessonSide }
   | { type: 'last-layer'; id: LastLayerCaseId }
+  // Generated outside the reducer so the reducer stays pure.
+  | { type: 'practice'; exercise: PracticeExercise }
   | { type: 'seek'; cursor: number }
   | { type: 'guide'; wholeStage?: boolean }
   | { type: 'clear-history' }
@@ -69,10 +76,14 @@ export function createSession(preset: Preset = 'solved'): Session {
 export function lessonExercise(lesson: Lesson): GuidedExercise {
   return lesson.kind === 'f2l'
     ? getExercise(lesson.id, lesson.variant, lesson.side)
-    : getLastLayerExercise(lesson.id);
+    : lesson.kind === 'practice'
+      ? lesson.exercise
+      : getLastLayerExercise(lesson.id);
 }
 
 export function isLessonComplete(lesson: Lesson, cube: Cube): boolean {
+  if (lesson.kind === 'practice')
+    return isPracticeComplete(lesson.exercise, cube);
   return lesson.kind === 'f2l'
     ? trainingStatus(cube, lesson.side) === 'paired'
     : lastLayerStatus(cube, getLastLayerExercise(lesson.id).case.step) ===
@@ -119,6 +130,12 @@ export function sessionReducer(state: Session, action: Action): Session {
       id: action.id,
       cursor: 0,
     });
+  if (action.type === 'practice')
+    return startLesson(
+      action.exercise,
+      action.exercise.stage === 'f2l' ? 'cross' : 'f2l',
+      { kind: 'practice', exercise: action.exercise, cursor: 0 },
+    );
   if (action.type === 'clear-history') {
     return {
       ...state,
