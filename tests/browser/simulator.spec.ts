@@ -165,9 +165,22 @@ for (const width of [320, 390, 768, 1440]) {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    const first = await page.getByTestId('cube-front').boundingBox();
-    const second = await page.getByTestId('cube-circles').boundingBox();
-    expect(first!.width).toBeGreaterThan(second!.width);
+    // VIEW-01: captions on one line; rings about as tall as the drawn cube.
+    const [cubeCaption, graphCaption] = await page
+      .locator('.cube-stage figcaption')
+      .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().top));
+    expect(Math.abs(cubeCaption - graphCaption)).toBeLessThan(1);
+    const drawnHeight = (selector: string) =>
+      page.locator(selector).evaluateAll((nodes) => {
+        const boxes = nodes.map((n) => n.getBoundingClientRect());
+        return (
+          Math.max(...boxes.map((b) => b.bottom)) -
+          Math.min(...boxes.map((b) => b.top))
+        );
+      });
+    const cubeHeight = await drawnHeight('[data-testid="cube-front"] polygon');
+    const ringHeight = await drawnHeight('[data-testid="cube-circles"] .ring');
+    expect(Math.abs(ringHeight / cubeHeight - 1)).toBeLessThan(0.15);
     await page
       .getByRole('button', { name: '↺ 반시계 방향', exact: true })
       .click();

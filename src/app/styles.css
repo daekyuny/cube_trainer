@@ -172,7 +172,8 @@ h1 {
 }
 .cube-stage {
   display: flex;
-  align-items: center;
+  /* Both captions on one line; the two pictures start at the same height. */
+  align-items: flex-start;
   padding: 8px 6px 0;
   min-height: 0;
   background: radial-gradient(ellipse at 48% 65%, #eff3e7 0%, transparent 65%);
@@ -182,11 +183,11 @@ figure {
   min-width: 0;
 }
 .primary-cube {
-  width: 55%;
+  width: 52%;
 }
+/* Sized so the graph's rings are about as tall as the drawn cube. */
 .secondary-cube {
-  width: 45%;
-  padding-top: 12px;
+  width: 48%;
 }
 .cube-svg {
   display: block;
@@ -710,9 +711,6 @@ footer > span {
     min-height: 0;
     max-width: 470px;
     margin: auto;
-  }
-  .secondary-cube {
-    padding-top: 12px;
   }
   .face-legend {
     font-size: 9px;
@@ -1290,9 +1288,6 @@ footer > span {
   .is-training figcaption,
   .is-training .face-legend {
     display: none;
-  }
-  .is-training .secondary-cube {
-    padding-top: 0;
   }
   .is-training .stage-toolbar {
     padding: 8px 12px 0;
