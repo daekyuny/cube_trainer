@@ -78,7 +78,10 @@ export type LastLayerCase = {
   next: LastLayerCaseId | null;
 };
 
-// Outer-face algorithms only; every case is shown in the orientation the
+// Algorithms follow the Happy Cubing beginner 2-Look lessons: parentheses group
+// repeated motions (트위스트 R U R' U', 슬레지해머 R' F R F'), f turns the front
+// two layers, M the middle layer and x the whole cube (x' turns it back so
+// the next step starts yellow up). Every case is shown in the orientation the
 // printed algorithm applies to, with red front / green right / yellow up.
 export const LAST_LAYER_CASES: LastLayerCase[] = [
   {
@@ -86,17 +89,17 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     step: 'oll-edges',
     name: '일자',
     recognition: '노란 엣지 두 개가 왼쪽·오른쪽으로 가로 일자를 이룹니다.',
-    algorithm: "F R U R' U' F'",
-    hint: '일자를 가로로 둔 채 F로 앞면을 열고 R U R′ U′로 엣지를 바꾼 뒤 F′로 닫습니다.',
+    algorithm: "F (R U R' U') F'",
+    hint: '일자를 가로로 두고 앞면을 시계 방향(F)으로 연 뒤 트위스트 한 번, F′로 원래대로 닫습니다.',
     next: 'oll-sune',
   },
   {
     id: 'oll-l',
     step: 'oll-edges',
-    name: 'L자',
-    recognition: '노란 엣지 두 개가 뒤·왼쪽에서 L자(9시~12시)를 이룹니다.',
-    algorithm: "F U R U' R' F'",
-    hint: 'L자를 뒤·왼쪽에 둡니다. 일자 공식에서 가운데 R U R′ U′를 U R U′ R′로 바꾼 형태입니다.',
+    name: 'ㄴ자',
+    recognition: '노란 엣지 두 개가 앞·오른쪽에서 ㄴ자(3시~6시)를 이룹니다.',
+    algorithm: "f (R U R' U') f'",
+    hint: '맞은 엣지를 앞쪽과 오른쪽에 둡니다. 일자 공식에서 F 대신 앞면 두 줄(f)을 한꺼번에 돌립니다.',
     next: 'oll-antisune',
   },
   {
@@ -104,8 +107,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     step: 'oll-edges',
     name: '점',
     recognition: '윗면 가운데만 노랗고 노란 엣지가 하나도 없습니다.',
-    algorithm: "F R U R' U' F' U2 F U R U' R' F'",
-    hint: '일자 공식으로 L자를 만들고 U2로 L자를 뒤·왼쪽에 둔 뒤 L자 공식을 이어 합니다.',
+    algorithm: "F (R U R' U') F' f (R U R' U') f'",
+    hint: '일자 공식을 먼저 하면 앞·오른쪽에 ㄴ자가 바로 생깁니다. 돌리지 않고 이어서 ㄴ자 공식을 합니다.',
     next: 'oll-pi',
   },
   {
@@ -114,8 +117,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: '수네 (Sune)',
     recognition:
       '노란 코너 하나가 앞·왼쪽에 있고, 앞·오른쪽 코너의 노랑은 앞을 봅니다.',
-    algorithm: "R U R' U R U2 R'",
-    hint: 'R U R′ U R U2 R′ 한 번으로 남은 세 코너를 함께 돌립니다.',
+    algorithm: "(R U R' U) (R U2 R')",
+    hint: '트위스트처럼 R U R′로 시작해 같은 방향으로 U 한 번 더, 올리고(R) 두 번 돌리고(U2) 내립니다(R′).',
     next: 'pll-t',
   },
   {
@@ -123,19 +126,18 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     step: 'oll-corners',
     name: '안티수네 (Antisune)',
     recognition:
-      '노란 코너 하나가 뒤·오른쪽에 있고, 앞·왼쪽 코너의 노랑은 앞을 봅니다.',
-    algorithm: "R U2 R' U' R U' R'",
-    hint: '수네를 거꾸로 실행한 수순입니다. R U2 R′로 시작합니다.',
+      '노란 코너 하나가 앞·오른쪽에 있고, 앞·왼쪽 코너의 노랑은 앞을 봅니다.',
+    algorithm: "(L' U' L U') (L' U2 L)",
+    hint: '수네를 왼손으로 똑같이 합니다. 맞은 노란 코너를 수네와 반대로 앞·오른쪽에 둡니다.',
     next: 'pll-y',
   },
   {
     id: 'oll-h',
     step: 'oll-corners',
     name: 'H',
-    recognition:
-      '노란 코너가 없고, 왼쪽·오른쪽 면에 노랑이 두 개씩 마주 봅니다.',
-    algorithm: "R U R' U R U' R' U R U2 R'",
-    hint: 'R U R′ U를 두 번 이어 가다 마지막을 R U2 R′로 마칩니다.',
+    recognition: '노란 코너가 없고, 앞·뒤 면에 노랑이 두 개씩 마주 봅니다.',
+    algorithm: "F (R U R' U') (R U R' U') (R U R' U') F'",
+    hint: '노랑 두 개씩을 앞뒤에 두고 일자 공식과 같은 틀에서 트위스트만 세 번 합니다.',
     next: 'pll-t',
   },
   {
@@ -144,8 +146,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: '파이 (Pi)',
     recognition:
       '노란 코너가 없고, 왼쪽 면에만 노랑 두 개가 나란히 있습니다. 오른쪽 두 코너의 노랑은 앞·뒤를 봅니다.',
-    algorithm: "R U2 R2 U' R2 U' R2 U2 R",
-    hint: 'R2와 U′를 번갈아 돌리는 부분이 핵심입니다.',
+    algorithm: "R U2 (R2 U') (R2 U') R2 U2 R",
+    hint: '같은 방향을 보는 노랑 두 개를 왼쪽에 둡니다. R U2 다음 R2 U′를 두 번 반복하고 R2 U2 R로 마칩니다.',
     next: 'pll-y',
   },
   {
@@ -153,8 +155,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     step: 'oll-corners',
     name: '헤드라이트',
     recognition: '노란 코너 두 개가 뒤쪽에 있고, 앞면에 노랑 두 개가 보입니다.',
-    algorithm: "R2 D R' U2 R D' R' U2 R'",
-    hint: 'D로 아래층을 잠시 돌렸다가 D′로 되돌립니다. 1·2층은 마지막에 복원됩니다.',
+    algorithm: "R2 D (R' U2 R) D' (R' U2 R')",
+    hint: 'R2 다음 아랫면을 왼손 약지로 D, R′ U2 R, D′로 되돌리고 R′ U2 R′. 1·2층은 마지막에 복원됩니다.',
     next: 'pll-t',
   },
   {
@@ -163,8 +165,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: 'T',
     recognition:
       '노란 코너 두 개가 오른쪽(앞·뒤)에 있고, 왼쪽 두 코너의 노랑은 앞·뒤를 봅니다.',
-    algorithm: "L F R' F' L' F R F'",
-    hint: 'L F R′ F′와 L′ F R F′ 두 묶음입니다.',
+    algorithm: "x (L U R' U') (L' U R U') x'",
+    hint: 'x로 아랫면을 앞으로 봅니다. 왼쪽 줄 내리고 U, 오른쪽 줄 내리고 U′, 왼쪽 올리고 U, 오른쪽 올리고 U′. 윗면이 U·U′로 왔다 갔다 하고, x′로 노랑을 다시 위로 둡니다.',
     next: 'pll-y',
   },
   {
@@ -173,28 +175,28 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: '나비 (Bowtie)',
     recognition:
       '노란 코너 두 개가 대각선(뒤·왼쪽, 앞·오른쪽)에 있고, 앞·왼쪽 코너의 노랑은 앞을 봅니다.',
-    algorithm: "R' F R B' R' F' R B",
-    hint: 'R′ F R B′와 R′ F′ R B 두 묶음입니다.',
+    algorithm: "x (U R' U' L) (U R U' L') x'",
+    hint: '맞은 코너를 앞·오른쪽에 두고 앞면 왼쪽에 노랑이 보이게 합니다. T와 같은 규칙에서 윗면을 먼저 돌립니다: U, 오른쪽 내리고 U′, 왼쪽 내리고 U, 오른쪽 올리고 U′, 왼쪽 올리기.',
     next: 'pll-t',
   },
   {
     id: 'pll-t',
     step: 'pll-corners',
-    name: '헤드라이트 · T-perm',
+    name: '헤드라이트 O · T-perm',
     recognition:
       '왼쪽 면에만 같은 색 코너 두 개(헤드라이트)가 있습니다. 헤드라이트를 왼쪽에 둡니다.',
-    algorithm: "R U R' U' R' F R2 U' R' U' R U R' F'",
-    hint: '오른쪽 두 코너를 맞바꿉니다. 왼쪽·오른쪽 엣지도 함께 바뀌지만 다음 단계에서 맞춥니다.',
+    algorithm: "(R U R' U') (R' F R F') F (R U' R') U' (R U R') F'",
+    hint: '헤드라이트 X 공식의 두 부분 순서를 바꿉니다: 트위스트 + 슬레지해머 다음 F, 페어 넣기(R U′ R′), U′, 꺼내기(R U R′), F′. 오른쪽 두 코너가 바뀝니다.',
     next: 'pll-ua',
   },
   {
     id: 'pll-y',
     step: 'pll-corners',
-    name: '대각선 · Y-perm',
+    name: '헤드라이트 X · Y-perm',
     recognition:
       '어느 옆면에도 헤드라이트가 없습니다. 대각선 두 코너를 맞바꿉니다.',
-    algorithm: "F R U' R' U' R U R' F' R U R' U' R' F R F'",
-    hint: '뒤·왼쪽과 앞·오른쪽 코너를 맞바꿉니다. 왼쪽·뒤 엣지도 함께 바뀌지만 다음 단계에서 맞춥니다.',
+    algorithm: "F (R U' R') U' (R U R') F' (R U R' U') (R' F R F')",
+    hint: '첫 부분: F로 열고 페어를 넣었다가(R U′ R′) U′ 후 다시 꺼내고(R U R′) F′. 둘째 부분: 트위스트 + 슬레지해머. 어느 방향에서 해도 됩니다.',
     next: 'pll-ub',
   },
   {
@@ -203,8 +205,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: 'Ua-perm',
     recognition:
       '뒷면 한 줄이 완성되어 있고, 앞면 가운데 엣지가 오른쪽 센터 색입니다.',
-    algorithm: "R U' R U R U R U' R' U' R2",
-    hint: '앞 엣지는 오른쪽, 오른쪽 엣지는 왼쪽, 왼쪽 엣지는 앞으로 갑니다. 완성된 줄은 뒤에 둡니다.',
+    algorithm: "M2 U M U2 M' U M2",
+    hint: '완성된 줄을 뒤에 둡니다. M2 후 아래 센터와 반대 색인 오른쪽 엣지를 U로 앞으로, M(가운데 줄 내리기) U2 M′, 같은 방향 U, M2.',
     next: null,
   },
   {
@@ -213,8 +215,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: 'Ub-perm',
     recognition:
       '뒷면 한 줄이 완성되어 있고, 앞면 가운데 엣지가 왼쪽 센터 색입니다.',
-    algorithm: "R2 U R U R' U' R' U' R' U R'",
-    hint: '앞 엣지는 왼쪽, 왼쪽 엣지는 오른쪽, 오른쪽 엣지는 앞으로 갑니다. Ua의 반대 방향입니다.',
+    algorithm: "M2 U' M U2 M' U' M2",
+    hint: 'Ua와 같은 규칙에서 U 방향만 반대입니다. M2 후 반대 색인 왼쪽 엣지를 U′로 앞으로, M U2 M′, 같은 방향 U′, M2.',
     next: null,
   },
   {
@@ -223,8 +225,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: 'H-perm',
     recognition:
       '완성된 줄이 없고, 각 옆면 가운데 엣지가 반대편 센터 색입니다.',
-    algorithm: 'R2 U2 R U2 R2 U2 R2 U2 R U2 R2',
-    hint: '앞↔뒤, 왼쪽↔오른쪽 엣지를 맞바꿉니다. R2와 U2만 사용합니다.',
+    algorithm: "M2 U' M2 U2 M2 U' M2",
+    hint: '앞↔뒤, 왼쪽↔오른쪽 엣지를 맞바꿉니다. M2 사이에 U′, U2, U′를 넣습니다.',
     next: null,
   },
   {
@@ -233,8 +235,8 @@ export const LAST_LAYER_CASES: LastLayerCase[] = [
     name: 'Z-perm',
     recognition:
       '완성된 줄이 없고, 앞 엣지는 왼쪽 센터 색, 오른쪽 엣지는 뒤 센터 색입니다.',
-    algorithm: "R' U' R U' R U R U' R' U R U R2 U' R' U2",
-    hint: '앞↔왼쪽, 오른쪽↔뒤 엣지를 맞바꿉니다. 마지막 U2로 윗층 각도를 맞춥니다.',
+    algorithm: "(M2 U') (M2 U') M' U2 M2 U2 M' U2",
+    hint: '바꿀 두 엣지를 앞·왼쪽에 둡니다. M2 U′를 두 번, M′ U2 M2 U2 M′. 마지막 U2로 윗층 각도를 맞춥니다.',
     next: null,
   },
 ];

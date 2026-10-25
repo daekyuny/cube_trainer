@@ -1,8 +1,15 @@
 import type { Dispatch, ReactNode } from 'react';
 import { notation } from '../../domain/cube/cube';
 import type { Cube } from '../../domain/cube/cube';
-import { isLessonView, lessonMove } from '../../domain/training/guide';
-import type { GuidedExercise } from '../../domain/training/guide';
+import {
+  isLessonView,
+  lessonMove,
+  triggerName,
+} from '../../domain/training/guide';
+import type {
+  GuidedExercise,
+  SolutionToken,
+} from '../../domain/training/guide';
 import type { Action } from '../simulator/session';
 
 // Shared token navigation: each letter seeks to "just after that move" with
@@ -24,17 +31,23 @@ export function SolutionSteps({
   doneLabel: string;
   children?: ReactNode;
 }) {
-  const rotated = !isLessonView(cube);
+  const reference = cursor === null ? null : exercise.checkpoints[cursor];
+  const rotated = reference !== null && !isLessonView(cube, reference);
   const next =
     cursor === null
       ? undefined
       : exercise.tokens.find((token) => token.end > cursor);
   const nextScreenMove =
-    next && cursor !== null
-      ? lessonMove(cube, {
-          ...exercise.solution[cursor],
-          turns: next.end - cursor === 2 ? 2 : exercise.solution[cursor].turns,
-        })
+    next && cursor !== null && reference
+      ? lessonMove(
+          cube,
+          {
+            ...exercise.solution[cursor],
+            turns:
+              next.end - cursor === 2 ? 2 : exercise.solution[cursor].turns,
+          },
+          reference,
+        )
       : undefined;
   const previous =
     cursor === null
@@ -72,25 +85,39 @@ export function SolutionSteps({
         >
           시작
         </button>
-        {exercise.tokens.map((token, index) => (
-          <button
-            key={index}
-            aria-disabled={busy || cursor === null}
-            className={`solution-token${cursor !== null && cursor >= token.end ? ' visited' : ''}`}
-            aria-label={`${index + 1}수 ${token.label}까지 이동`}
-            aria-current={
-              cursor !== null && cursor > token.start && cursor <= token.end
-                ? 'step'
-                : undefined
-            }
-            data-partial={
-              cursor !== null && cursor > token.start && cursor < token.end
-            }
-            onClick={() => seek(token.end)}
-          >
-            {token.label}
-          </button>
-        ))}
+        {segments(exercise.tokens).map(({ tokens, group }) => {
+          const buttons = tokens.map(({ token, index }) => (
+            <button
+              key={index}
+              aria-disabled={busy || cursor === null}
+              className={`solution-token${cursor !== null && cursor >= token.end ? ' visited' : ''}`}
+              aria-label={`${index + 1}수 ${token.label}까지 이동`}
+              aria-current={
+                cursor !== null && cursor > token.start && cursor <= token.end
+                  ? 'step'
+                  : undefined
+              }
+              data-partial={
+                cursor !== null && cursor > token.start && cursor < token.end
+              }
+              onClick={() => seek(token.end)}
+            >
+              {token.label}
+            </button>
+          ));
+          if (group === undefined) return buttons;
+          const name = triggerName(tokens.map(({ token }) => token));
+          return (
+            <span
+              key={`group-${group}`}
+              className="solution-group"
+              data-trigger={name}
+            >
+              <span className="solution-group-moves">{buttons}</span>
+              {name && <small aria-hidden="true">{name}</small>}
+            </span>
+          );
+        })}
       </div>
       <p className="notation-note solution-reference">
         수순·설명은 빨강 앞 · 초록 오른쪽 기준입니다.
@@ -138,4 +165,19 @@ export function SolutionSteps({
       {children}
     </>
   );
+}
+
+// Consecutive tokens of one parenthesized group render inside one bracket.
+function segments(all: SolutionToken[]) {
+  const result: {
+    group?: number;
+    tokens: { token: SolutionToken; index: number }[];
+  }[] = [];
+  all.forEach((token, index) => {
+    const last = result.at(-1);
+    if (last && token.group !== undefined && last.group === token.group)
+      last.tokens.push({ token, index });
+    else result.push({ group: token.group, tokens: [{ token, index }] });
+  });
+  return result;
 }

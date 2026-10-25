@@ -154,16 +154,18 @@ export function sessionReducer(state: Session, action: Action): Session {
     )
       return state;
     // Record actual inverse turns too: seeking must work even after history reset.
+    // One viewing frame maps the whole run: queued moves keep it unchanged.
+    const reference = exercise.checkpoints[from];
     const queue =
       to > from
         ? exercise.solution
             .slice(from, to)
-            .map((move) => ({ move: lessonMove(state.cube, move) }))
+            .map((move) => ({ move: lessonMove(state.cube, move, reference) }))
         : exercise.solution
             .slice(to, from)
             .reverse()
             .map((move) => ({
-              move: lessonMove(state.cube, inverse(move)),
+              move: lessonMove(state.cube, inverse(move), reference),
               backward: true,
             }));
     return { ...state, queue, message: '' };
@@ -182,9 +184,9 @@ export function sessionReducer(state: Session, action: Action): Session {
     const end = action.wholeStage ? exercise.solution.length : cursor + 1;
     return {
       ...state,
-      queue: exercise.solution
-        .slice(cursor, end)
-        .map((move) => ({ move: lessonMove(state.cube, move) })),
+      queue: exercise.solution.slice(cursor, end).map((move) => ({
+        move: lessonMove(state.cube, move, exercise.checkpoints[cursor]),
+      })),
       message: '',
     };
   }
@@ -231,6 +233,7 @@ export function sessionReducer(state: Session, action: Action): Session {
             cube,
             state.lesson.cursor,
             action.command.undo || action.command.backward,
+            state.cube,
           ),
         }
       : null,

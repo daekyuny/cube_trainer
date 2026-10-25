@@ -17,7 +17,9 @@ import {
   ROTATIONS,
   SLICES,
   solvedCube,
+  WIDE_FACES,
 } from '../src/domain/cube/cube.ts';
+import { lessonMove } from '../src/domain/training/guide.ts';
 import type { Cube, Face, Move, Vec3 } from '../src/domain/cube/cube.ts';
 
 function state(cube: Cube) {
@@ -34,7 +36,12 @@ test('initial colors and opposite centers follow the requested orientation', () 
   assert.ok(isSolved(cube));
 });
 
-for (const face of [...FACES, ...SLICES, ...ROTATIONS] as const) {
+for (const face of [
+  ...FACES,
+  ...WIDE_FACES,
+  ...SLICES,
+  ...ROTATIONS,
+] as const) {
   test(`${face}: inverse, four turns and half-turn agree without mutating input`, () => {
     const cube = solvedCube();
     const before = JSON.stringify(cube);
@@ -133,6 +140,52 @@ test('M/E/S follow L/D/F and x/y/z follow R/U/F, matching the standard identitie
     ].map((move) => notation(move as Move)),
     ["M'", 'x', "z'", '→', 'y2'],
   );
+});
+
+test('wide turns move the outer face with its middle layer', () => {
+  // f = F S, r = R M′, u = U E′, l = L M, d = D E, b = B S′.
+  for (const [wide, layers] of [
+    ['f', 'F S'],
+    ['r', "R M'"],
+    ['u', "U E'"],
+    ['l', 'L M'],
+    ['d', 'D E'],
+    ['b', "B S'"],
+  ])
+    assert.deepEqual(
+      state(applyMoves(solvedCube(), parse(wide))),
+      state(applyMoves(solvedCube(), parse(layers))),
+      wide,
+    );
+  assert.deepEqual(parse("f' r2").map(notation), ["f'", 'r2']);
+});
+
+test('a printed move replays on the same pieces from all 24 held views', () => {
+  const position = applyMoves(solvedCube(), parse("R U F' L2 D B'"));
+  const views = [[], ...['X', 'X2', "X'", 'Z', "Z'"].map(parse)].flatMap(
+    (prefix) =>
+      [0, 1, 2, 3].map((turns): Move[] => [
+        ...prefix,
+        ...Array<Move>(turns).fill({ face: 'Y', turns: 1 }),
+      ]),
+  );
+  assert.equal(
+    new Set(views.map((view) => state(applyMoves(solvedCube(), view)).join()))
+      .size,
+    24,
+  );
+  const printed = [...FACES, ...WIDE_FACES, ...SLICES, ...ROTATIONS].flatMap(
+    (face) => [1, -1, 2].map((turns) => ({ face, turns }) as Move),
+  );
+  for (const view of views) {
+    const held = applyMoves(position, view);
+    for (const move of printed)
+      assert.deepEqual(
+        applyMove(held, lessonMove(held, move, position)),
+        applyMoves(applyMove(position, move), view),
+        `${view.map(notation).join(' ')} / ${notation(move)}`,
+      );
+  }
 });
 
 test('orientation normalization recovers white down / red front from all 24 views', () => {

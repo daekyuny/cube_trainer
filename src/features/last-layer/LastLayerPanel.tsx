@@ -10,6 +10,7 @@ import {
 } from '../../domain/last-layer/cases';
 import type { LastLayerCaseId } from '../../domain/last-layer/cases';
 import type { Action, LastLayerLesson, Session } from '../simulator/session';
+import { moveCount } from '../../domain/training/guide';
 import { SolutionSteps } from '../training/SolutionSteps';
 
 export function LastLayerPanel({
@@ -121,7 +122,7 @@ export function LastLayerPanel({
                         </p>
                         <div className="solution-heading">
                           <strong>
-                            공식 <span>· {exercise.tokens.length}수</span>
+                            공식 <span>· {moveCount(exercise.tokens)}수</span>
                           </strong>
                           <button
                             className="text-button"
@@ -153,9 +154,11 @@ export function LastLayerPanel({
                                 <summary>풀이 설명</summary>
                                 <p>{item.hint}</p>
                                 <p>
-                                  ′는 해당 면을 바라본 반시계 회전입니다. 공식
-                                  중에는 1·2층이 잠시 흐트러졌다가 마지막에
-                                  복원됩니다.
+                                  ′는 해당 면을 바라본 반시계 회전입니다. 괄호는
+                                  한 번에 외우는 묶음 동작이고, f는 앞면 두 줄,
+                                  M은 가운데 세로 줄(L 방향), x는 큐브 전체(R
+                                  방향)를 돌립니다. 공식 중에는 1·2층이 잠시
+                                  흐트러졌다가 마지막에 복원됩니다.
                                 </p>
                               </details>
                             </SolutionSteps>

@@ -6,6 +6,7 @@ import {
   NORMALS,
   centerColor,
   equal,
+  isTurning,
   rotate,
   rotation,
 } from '../../domain/cube/cube';
@@ -52,7 +53,7 @@ export function CubeView({
   const active = move ? rotation(move) : null;
   const eased = progress * progress * (3 - 2 * progress);
   const transform = (point: Vec3, position: Vec3) =>
-    active && (active.layer === null || position[active.axis] === active.layer)
+    active && isTurning(active, position)
       ? rotate(point, active.axis, active.angle * eased)
       : point;
   const polygons: {

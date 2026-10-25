@@ -21,7 +21,11 @@ import {
   lastLayerStatus,
 } from '../src/domain/last-layer/cases.ts';
 import type { LastLayerCaseId } from '../src/domain/last-layer/cases.ts';
-import { parseAlgorithm } from '../src/domain/training/guide.ts';
+import {
+  moveCount,
+  parseAlgorithm,
+  triggerName,
+} from '../src/domain/training/guide.ts';
 import {
   createSession,
   sessionReducer,
@@ -94,9 +98,18 @@ test('LL-01: 3+7 OLL and 2+4 PLL cases start legally from intact F2L with defaul
   assert.equal(lastLayerCases('pll').length, 6);
   for (const e of LAST_LAYER_EXERCISES) {
     const moves = parseAlgorithm(e.case.algorithm);
-    // Outer faces only: no whole-cube rotation, wide or slice turns.
-    assert.ok(moves.every((move) => FACES.includes(move.face as never)));
-    assert.equal(e.case.algorithm.split(' ').length, moves.length);
+    // Outer faces plus the video's f, M and x; x always returns with x'.
+    assert.ok(
+      moves.every((move) =>
+        [...FACES, 'f', 'M', 'X'].includes(move.face as never),
+      ),
+    );
+    assert.equal(e.tokens.length, moves.length);
+    assert.equal(
+      moves.filter((move) => move.face === 'X').length % 2,
+      0,
+      e.case.id,
+    );
     assert.deepEqual(applyMoves(solvedCube(), e.setup), e.initial);
     assert.ok(
       isSolved(applyMoves(e.initial, e.setup.slice().reverse().map(inverse))),
@@ -118,13 +131,13 @@ test('LL-01: 3+7 OLL and 2+4 PLL cases start legally from intact F2L with defaul
 test('LL-02: each start shows its named case in the orientation the algorithm expects', () => {
   const edges: Partial<Record<LastLayerCaseId, string[]>> = {
     'oll-line': ['B:B', 'F:F', 'L:U', 'R:U'],
-    'oll-l': ['B:U', 'F:F', 'L:U', 'R:R'],
+    'oll-l': ['B:B', 'F:U', 'L:L', 'R:U'],
     'oll-dot': ['B:B', 'F:F', 'L:L', 'R:R'],
   };
   const corners: Partial<Record<LastLayerCaseId, string[]>> = {
     'oll-sune': ['BL:B', 'BR:R', 'FL:U', 'FR:F'],
-    'oll-antisune': ['BL:L', 'BR:U', 'FL:F', 'FR:R'],
-    'oll-h': ['BL:L', 'BR:R', 'FL:L', 'FR:R'],
+    'oll-antisune': ['BL:L', 'BR:B', 'FL:F', 'FR:U'],
+    'oll-h': ['BL:B', 'BR:B', 'FL:F', 'FR:F'],
     'oll-pi': ['BL:L', 'BR:B', 'FL:L', 'FR:F'],
     'oll-headlights': ['BL:U', 'BR:U', 'FL:F', 'FR:F'],
     'oll-t': ['BL:B', 'BR:U', 'FL:F', 'FR:U'],
@@ -288,7 +301,7 @@ test('LL-05: session guides, seeks, follows rotated views and blocks demos after
 });
 
 test('LL-06: manual input tracks the guide, U2 as two quarter turns, and off-path detection', () => {
-  const e = getLastLayerExercise('oll-dot');
+  const e = getLastLayerExercise('oll-pi');
   let session = sessionReducer(createSession(), {
     type: 'last-layer',
     id: e.case.id,
@@ -318,4 +331,55 @@ test('LL-06: manual input tracks the guide, U2 as two quarter turns, and off-pat
     session,
   );
   assert.deepEqual(session.cube, getLastLayerExercise('pll-z').initial);
+});
+
+test('LL-08: grouped notation, named triggers, f / M / x steps and held views', () => {
+  const groups = (id: LastLayerCaseId) => {
+    const { tokens } = getLastLayerExercise(id);
+    const ids = [...new Set(tokens.map((token) => token.group))].filter(
+      (group) => group !== undefined,
+    );
+    return ids.map((group) => tokens.filter((token) => token.group === group));
+  };
+  // H: F, three twists, F′; the twist group is named once per repeat.
+  assert.deepEqual(
+    groups('oll-h').map((group) => triggerName(group)),
+    ['트위스트', '트위스트', '트위스트'],
+  );
+  assert.deepEqual(
+    groups('pll-t').map((group) => triggerName(group)),
+    ['트위스트', '슬레지해머', undefined, undefined],
+  );
+  assert.equal(groups('oll-pi').length, 2);
+  // Rotations change the view only: T is 8 turns between x and x′.
+  const t = getLastLayerExercise('oll-t');
+  assert.equal(t.tokens.length, 10);
+  assert.equal(moveCount(t.tokens), 8);
+  // A viewing turn of the learner's own does not pass the printed x.
+  let session = sessionReducer(createSession(), {
+    type: 'last-layer',
+    id: 'oll-t',
+  });
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'Y', turns: 1 } }),
+  );
+  assert.equal(session.lesson!.cursor, 0);
+  session = drain(
+    sessionReducer(session, { type: 'move', move: { face: 'X', turns: -1 } }),
+  );
+  assert.equal(session.lesson!.cursor, 0);
+  // From that held view, the next guided step turns the cube the printed way.
+  session = drain(sessionReducer(session, { type: 'guide' }));
+  assert.equal(session.lesson!.cursor, 1);
+  session = drain(sessionReducer(session, { type: 'guide', wholeStage: true }));
+  assert.equal(lastLayerStatus(session.cube, 'oll-corners'), 'complete');
+  // f and M are followed by hand like any face turn.
+  for (const id of ['oll-l', 'pll-ua'] as const) {
+    const e = getLastLayerExercise(id);
+    session = sessionReducer(createSession(), { type: 'last-layer', id });
+    for (const move of e.solution)
+      session = drain(sessionReducer(session, { type: 'move', move }));
+    assert.equal(session.lesson!.cursor, e.solution.length, id);
+    assert.equal(lastLayerStatus(session.cube, e.case.step), 'complete');
+  }
 });

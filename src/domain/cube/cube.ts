@@ -5,7 +5,12 @@ export type Axis = 0 | 1 | 2;
 export type Slice = 'M' | 'E' | 'S';
 // Whole-cube rotations x / y / z (upper case keeps one Move type).
 export type CubeRotation = 'X' | 'Y' | 'Z';
-export type Move = { face: Face | Slice | CubeRotation; turns: 1 | -1 | 2 };
+// Wide turns (lower case): the outer face together with the middle layer.
+export type WideFace = 'f' | 'r' | 'u' | 'd' | 'l' | 'b';
+export type Move = {
+  face: Face | WideFace | Slice | CubeRotation;
+  turns: 1 | -1 | 2;
+};
 export type Sticker = {
   id: string;
   position: Vec3;
@@ -18,6 +23,7 @@ export type Preset = 'solved' | 'random' | 'cross' | 'f2l';
 export const FACES: Face[] = ['F', 'R', 'U', 'D', 'L', 'B'];
 export const SLICES: Slice[] = ['M', 'E', 'S'];
 export const ROTATIONS: CubeRotation[] = ['X', 'Y', 'Z'];
+export const WIDE_FACES: WideFace[] = ['f', 'r', 'u', 'd', 'l', 'b'];
 // Standard directions: M follows L, E follows D, S follows F; x follows R,
 // y follows U, z follows F.
 const SLICE_REFERENCE: Record<Slice, Face> = { M: 'L', E: 'D', S: 'F' };
@@ -99,35 +105,67 @@ export function rotate(vector: Vec3, axis: Axis, angle: number): Vec3 {
   return next;
 }
 
-export function rotation(move: Move): {
-  axis: Axis;
-  layer: number | null;
-  angle: number;
-} {
-  const whole = ROTATIONS.includes(move.face as CubeRotation);
-  const slice = SLICES.includes(move.face as Slice);
-  const reference = whole
-    ? ROTATION_REFERENCE[move.face as CubeRotation]
-    : slice
-      ? SLICE_REFERENCE[move.face as Slice]
-      : (move.face as Face);
-  const normal = NORMALS[reference];
+// The face whose clockwise turn sets this move's axis and direction.
+export function referenceFace(move: Move): Face {
+  if (ROTATIONS.includes(move.face as CubeRotation))
+    return ROTATION_REFERENCE[move.face as CubeRotation];
+  if (SLICES.includes(move.face as Slice))
+    return SLICE_REFERENCE[move.face as Slice];
+  return move.face.toUpperCase() as Face;
+}
+
+// The same kind of move (face, wide, slice, rotation) turning clockwise
+// around `face` instead: used to replay a move from another viewing side.
+export function alongFace(move: Move, face: Face): Move {
+  if (FACES.includes(move.face as Face)) return { ...move, face };
+  if (WIDE_FACES.includes(move.face as WideFace))
+    return { ...move, face: face.toLowerCase() as WideFace };
+  // Slices and rotations: pick the one on the face's axis; the opposite
+  // reference face means the inverse direction.
+  const references: Partial<Record<Move['face'], Face>> = isCubeRotation(move)
+    ? ROTATION_REFERENCE
+    : SLICE_REFERENCE;
+  const axis = (f: Face) => NORMALS[f].findIndex((value) => value !== 0);
+  const kind = (Object.keys(references) as Move['face'][]).find(
+    (k) => axis(references[k]!) === axis(face),
+  )!;
+  return references[kind] === face
+    ? { ...move, face: kind }
+    : { ...inverse(move), face: kind };
+}
+
+// `layers: null` turns every piece (whole-cube rotation).
+export type Turn = { axis: Axis; layers: number[] | null; angle: number };
+
+export function rotation(move: Move): Turn {
+  const normal = NORMALS[referenceFace(move)];
   const axis = normal.findIndex((value) => value !== 0) as Axis;
   return {
     axis,
-    layer: whole ? null : slice ? 0 : normal[axis],
+    layers: isCubeRotation(move)
+      ? null
+      : SLICES.includes(move.face as Slice)
+        ? [0]
+        : WIDE_FACES.includes(move.face as WideFace)
+          ? [normal[axis], 0]
+          : [normal[axis]],
     angle: (-normal[axis] * move.turns * Math.PI) / 2,
   };
 }
 
+export function isTurning(turn: Turn, position: Vec3): boolean {
+  return turn.layers === null || turn.layers.includes(position[turn.axis]);
+}
+
 export function applyMove(cube: Cube, move: Move): Cube {
-  const { axis, layer, angle } = rotation(move);
+  const turn = rotation(move);
+  const { axis, angle } = turn;
   const integerRotation = (vector: Vec3): Vec3 =>
     rotate(vector, axis, angle).map(
       (value) => Math.round(value) || 0,
     ) as unknown as Vec3;
   return cube.map((sticker) =>
-    layer === null || sticker.position[axis] === layer
+    isTurning(turn, sticker.position)
       ? {
           ...sticker,
           position: integerRotation(sticker.position),

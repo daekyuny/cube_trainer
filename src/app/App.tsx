@@ -60,7 +60,7 @@ const firstCase: Record<'oll' | 'pll', LastLayerCaseId> = {
   oll: 'oll-line',
   pll: 'pll-t',
 };
-// Middle layers and whole-cube turns, beside the six face buttons.
+// Middle layers, wide turns and whole-cube turns, beside the six face buttons.
 const extraMoves: { face: Move['face']; label: string; name: string }[] = [
   { face: 'M', label: 'M', name: '세로 중간 · L 방향' },
   { face: 'E', label: 'E', name: '가로 중간 · D 방향' },
@@ -68,6 +68,9 @@ const extraMoves: { face: Move['face']; label: string; name: string }[] = [
   { face: 'X', label: 'x', name: '전체 · R 방향' },
   { face: 'Y', label: 'y', name: '전체 · U 방향' },
   { face: 'Z', label: 'z', name: '전체 · F 방향' },
+  { face: 'f', label: 'f', name: '앞 두 줄 · F 방향' },
+  { face: 'r', label: 'r', name: '오른쪽 두 줄 · R 방향' },
+  { face: 'u', label: 'u', name: '위 두 줄 · U 방향' },
 ];
 const keyMoves: Move['face'][] = [...FACES, ...SLICES, ...ROTATIONS];
 const faceNames: Record<Face, string> = {
@@ -441,7 +444,10 @@ export function App() {
                   </button>
                 ))}
               </div>
-              <div className="extra-moves" aria-label="중간층과 큐브 전체 회전">
+              <div
+                className="extra-moves"
+                aria-label="중간층·큐브 전체·두 줄 회전"
+              >
                 {extraMoves.map((item) => (
                   <button
                     key={item.face}
@@ -555,8 +561,10 @@ export function App() {
               <p>
                 2-Look OLL은 엣지 방향(노란 십자) → 코너 방향(윗면 노랑), 2-Look
                 PLL은 코너 위치(헤드라이트) → 엣지 위치(완성) 순서로 연습합니다.
-                넓은 회전·중간층 없이 바깥 면만 돌리는 공식을 사용하며, 각
-                케이스는 공식을 바로 적용하는 각도로 시작합니다. 단계를 마치면
+                공식은 해피 큐빙 초급 CFOP 강의 방식을 따라 반복 동작을 괄호로
+                묶고(트위스트 R U R′ U′, 슬레지해머 R′ F R F′), 앞 두
+                줄(f)·가운데 줄(M)·큐브 전체(x) 회전으로 외울 양을 줄였습니다.
+                각 케이스는 공식을 바로 적용하는 각도로 시작하며, 단계를 마치면
                 이어지는 다음 단계 케이스로 넘어갈 수 있습니다.
               </p>
             )}
@@ -578,8 +586,9 @@ export function App() {
               노란 윗면에서 내려다볼 때 오른쪽은 시계 방향, 왼쪽은 반시계
               방향입니다. 오른쪽 회전 후에는 기존 오른쪽 면이 새 앞면이 됩니다.
               위·아래 센터는 유지되고 앞·옆·뒤의 기준이 바뀝니다. 면 회전 중
-              노랑·흰색 스티커는 다른 면으로 움직일 수 있습니다. 중간층 회전은
-              지원하지 않습니다.
+              노랑·흰색 스티커는 다른 면으로 움직일 수 있습니다. 중간층(M·E·S)과
+              두 줄(f·r·u) 회전은 버튼으로, 중간층은 키보드로도 돌릴 수
+              있습니다.
             </p>
             <p>
               문자 키는 시계 방향, Shift + 문자 키는 반시계 방향입니다. 화면의

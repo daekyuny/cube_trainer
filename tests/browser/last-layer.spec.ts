@@ -61,7 +61,7 @@ test('LL-03: continuing from the line case runs the full 2-look chain to a solve
   await openMode(page, '2-Look OLL');
   const steps = [
     ['노란 십자 완성', /이어서 · OLL 2단계 수네/],
-    ['윗면 전체 노랑 완성', /이어서 · PLL 1단계 헤드라이트 · T-perm/],
+    ['윗면 전체 노랑 완성', /이어서 · PLL 1단계 헤드라이트 O · T-perm/],
     ['네 옆면 모두 헤드라이트 완성', /이어서 · PLL 2단계 Ua-perm/],
   ] as const;
   for (const [badge, next] of steps) {
@@ -105,6 +105,46 @@ test('LL-04/05: rotated views run the red-front algorithm on actual faces; lette
   // Manual turn opens F2L: status explains that the algorithm is in progress.
   await page.keyboard.press('r');
   await expect(status(page)).toHaveAttribute('data-status', 'f2l-open');
+});
+
+test('LL-08: grouped triggers, x whole-cube steps and the f button follow the guide', async ({
+  page,
+}) => {
+  await openMode(page, '2-Look OLL');
+  // H: F, three named twists in brackets, F′.
+  await page.locator('.case-select').nth(5).click();
+  await expect(page.locator('.solution-group')).toHaveCount(3);
+  await expect(page.locator('.solution-group small')).toHaveText([
+    '트위스트',
+    '트위스트',
+    '트위스트',
+  ]);
+  await expect(page.locator('.solution-heading')).toContainText('14수');
+  // T: x shows the white bottom in front; x′ at the end returns yellow up.
+  await page.locator('.case-select').nth(8).click();
+  await expect(page.locator('.solution-heading')).toContainText('8수');
+  await page.getByRole('button', { name: '1수 x까지 이동' }).click();
+  await expect(page.getByLabel('회전 이력')).toHaveText(/x$/);
+  await expect(page.getByTestId('cube-front')).toHaveAttribute(
+    'aria-label',
+    /F 흰색/,
+  );
+  await expect(page.locator('.solution-reference')).not.toContainText(
+    '현재 화면',
+  );
+  await page.getByRole('button', { name: '전체 시연' }).click();
+  await expect(status(page)).toHaveAttribute('data-status', 'complete');
+  await page.getByRole('button', { name: /^10수 x/ }).click();
+  await expect(page.getByTestId('cube-front')).toHaveAttribute(
+    'aria-label',
+    /F 빨강, R 초록, U 노랑/,
+  );
+  // ㄴ자: the on-screen f button is the printed first step.
+  await page.locator('.case-select').nth(1).click();
+  await page.getByRole('button', { name: /^f 앞 두 줄/ }).click();
+  await expect(
+    page.getByRole('button', { name: '1수 f까지 이동' }),
+  ).toHaveAttribute('aria-current', 'step');
 });
 
 test('LL-06: switching modes or cases cancels a running demonstration', async ({

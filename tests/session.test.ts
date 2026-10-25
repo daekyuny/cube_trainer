@@ -8,8 +8,16 @@ import {
 } from '../src/features/simulator/session.ts';
 import type { Action } from '../src/features/simulator/session.ts';
 import { LAST_LAYER_EXERCISES } from '../src/domain/last-layer/cases.ts';
-import { applyMove, applyMoves, isSolved } from '../src/domain/cube/cube.ts';
-import type { Move } from '../src/domain/cube/cube.ts';
+import {
+  applyMove,
+  applyMoves,
+  centerColor,
+  FACES,
+  isCubeRotation,
+  isSolved,
+  normalizeOrientation,
+} from '../src/domain/cube/cube.ts';
+import type { Cube, Move } from '../src/domain/cube/cube.ts';
 import {
   EXERCISES,
   getExercise,
@@ -358,6 +366,14 @@ test('F2L-12: changing view mid-solution, manual screen turns, undo and invalid 
   assert.deepEqual(session.cube, getExercise(1).initial);
 });
 
+// Which face shows each printed face's center: the learner's held view.
+const frame = (cube: Cube, reference: Cube) =>
+  FACES.map((face) =>
+    FACES.find(
+      (shown) => centerColor(cube, shown) === centerColor(reference, face),
+    ),
+  ).join('');
+
 test('ORIENT-01: lessons judge and demonstrate correctly after vertical whole-cube flips', () => {
   const views: Move[][] = [
     [{ face: 'X', turns: 1 }],
@@ -380,8 +396,17 @@ test('ORIENT-01: lessons judge and demonstrate correctly after vertical whole-cu
       let session = sessionReducer(createSession(), start);
       for (const move of view)
         session = drain(sessionReducer(session, { type: 'move', move }));
-      // Whole-cube turns are never "off the path".
-      assert.equal(session.lesson!.cursor, 0);
+      // Whole-cube turns are never "off the path". When an algorithm starts
+      // with x, a view equal to "x done, held turned" may count as that step.
+      const startsRotated = isCubeRotation(
+        lessonExercise(session.lesson!).solution[0],
+      );
+      const cursor = session.lesson!.cursor!;
+      assert.ok(startsRotated ? cursor <= 1 : cursor === 0);
+      const held = frame(
+        session.cube,
+        lessonExercise(session.lesson!).checkpoints[cursor],
+      );
       assert.equal(isLessonComplete(session.lesson!, session.cube), false);
       session = drain(
         sessionReducer(session, { type: 'guide', wholeStage: true }),
@@ -390,10 +415,17 @@ test('ORIENT-01: lessons judge and demonstrate correctly after vertical whole-cu
       assert.equal(session.lesson!.cursor, exercise.solution.length);
       assert.equal(isLessonComplete(session.lesson!, session.cube), true);
       // The demonstration turned the faces the learner sees, not printed ones.
-      assert.deepEqual(
-        session.cube,
-        applyMoves(exercise.checkpoints.at(-1)!, view),
-      );
+      if (startsRotated) {
+        assert.deepEqual(
+          normalizeOrientation(session.cube),
+          normalizeOrientation(exercise.checkpoints.at(-1)!),
+        );
+        assert.equal(frame(session.cube, exercise.checkpoints.at(-1)!), held);
+      } else
+        assert.deepEqual(
+          session.cube,
+          applyMoves(exercise.checkpoints.at(-1)!, view),
+        );
       // A middle-layer turn leaves the guided path.
       session = drain(
         sessionReducer(session, {
