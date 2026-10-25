@@ -61,6 +61,46 @@ function scrambleLastLayer(random: Random): Move[] {
 
 const join = (...parts: string[]) => parts.filter(Boolean).join(' ');
 
+// Side words in clockwise order seen from above (front = the large left face).
+const SIDES = ['앞', '왼쪽', '뒤', '오른쪽'] as const;
+type Side = (typeof SIDES)[number];
+const SIDE_RANK: Record<Side, number> = { 앞: 0, 뒤: 1, 왼쪽: 2, 오른쪽: 3 };
+
+// A case description is written for its printed angle, reached from the
+// start by `before`. Rename its sides for the start as shown: under U the
+// piece seen at the right comes to the front, so "front" reads "right".
+export function startView(text: string, before: string): string {
+  const steps = QUARTERS[before];
+  if (!steps) return text;
+  const turn = (side: Side) => SIDES[(SIDES.indexOf(side) + 4 - steps) % 4];
+  const renamed = text.replace(
+    /(앞쪽|뒤쪽|앞|뒷|뒤|왼쪽|오른쪽)( ?면)?/g,
+    (_, word: string, face?: string) => {
+      const toward = word === '앞쪽' || word === '뒤쪽';
+      const side = turn(
+        (word === '뒷' ? '뒤' : toward ? word.slice(0, 1) : word) as Side,
+      );
+      const area = side === '앞' || side === '뒤';
+      if (face) return area ? `${side === '뒤' ? '뒷' : '앞'}면` : `${side} 면`;
+      return toward && area ? `${side}쪽` : side;
+    },
+  );
+  return (
+    renamed
+      // Keep pairs in the usual order: front/back first, then left/right.
+      .replace(
+        /(앞|뒤|왼쪽|오른쪽)·(앞|뒤|왼쪽|오른쪽)/g,
+        (pair, a: Side, b: Side) =>
+          SIDE_RANK[a] > SIDE_RANK[b] ? `${b}·${a}` : pair,
+      )
+      // The object particle follows the new last syllable: 뒤를, 앞을.
+      .replace(
+        /(앞|뒤|왼쪽|오른쪽)(을|를)/g,
+        (_, side: Side) => `${side}${side === '뒤' ? '를' : '을'}`,
+      )
+  );
+}
+
 // The taught case for this cube, with the fewest U adjustments around it.
 export function findCase(
   cube: Cube,
@@ -116,7 +156,7 @@ function lastLayerPractice(
       stage: step,
       algorithm,
       caseName: found.item.name,
-      recognition: found.item.recognition,
+      recognition: startView(found.item.recognition, found.before),
       hint: found.item.hint,
       before: found.before,
       after: found.after,

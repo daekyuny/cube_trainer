@@ -1230,6 +1230,10 @@ footer > span {
 .next-case-button {
   width: 100%;
 }
+.recognition-frame {
+  color: #7b8a74;
+  font-size: 10px;
+}
 .hidden-guide-note {
   color: #697963;
 }

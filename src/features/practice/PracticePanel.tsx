@@ -137,7 +137,10 @@ export function PracticePanel({
                 <strong>케이스</strong> {exercise.caseName}
               </p>
               <p className="case-recognition">
-                <strong>인식</strong> {exercise.recognition}
+                <strong>인식</strong> {exercise.recognition}{' '}
+                <small className="recognition-frame">
+                  (시작 배치 기준 · 앞 = 크게 보이는 왼쪽 면)
+                </small>
               </p>
               {exercise.turnNote && (
                 <p className="notation-note" data-testid="practice-auf">
