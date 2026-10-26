@@ -17,6 +17,29 @@ const activeRings = (page: Page) =>
     .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-ring')));
 const idle = (page: Page) =>
   expect(page.getByTestId('cube-stage')).toHaveAttribute('data-busy', 'false');
+// The graph on the first frame of a turn, read inside the page: under load,
+// round trips from the test could outlast a whole 650 ms turn.
+const midTurn = async (page: Page) =>
+  (
+    await page.waitForFunction(
+      () => {
+        const svg = document.querySelector('[data-testid="cube-circles"]');
+        if (!svg?.getAttribute('data-turning')) return null;
+        const symbol = svg.querySelector('[data-testid="circle-move"]');
+        return {
+          turning: svg.getAttribute('data-turning'),
+          rings: [...svg.querySelectorAll('[data-active]')]
+            .map((n) => n.getAttribute('data-ring'))
+            .sort(),
+          arrows: svg.querySelectorAll('.ring-arrow').length,
+          symbol: symbol?.textContent,
+          active: symbol?.classList.contains('is-active'),
+        };
+      },
+      null,
+      { polling: 'raf' },
+    )
+  ).jsonValue();
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -46,11 +69,14 @@ test('CIRCLE-02: a turn highlights its ring, shows the symbol and slides the dot
   await page.getByLabel('천천히 돌려 보기').check();
   const before = await dots(page);
   await page.keyboard.press('r');
-  await expect(graph(page)).toHaveAttribute('data-turning', 'R');
-  expect(await activeRings(page)).toEqual(['0:1']);
-  await expect(graph(page).locator('.ring-arrow')).toHaveCount(1);
-  await expect(graph(page).getByTestId('circle-move')).toHaveText('R');
-  await expect(graph(page).getByTestId('circle-move')).toHaveClass(/is-active/);
+  const turning = await midTurn(page);
+  expect(turning).toEqual({
+    turning: 'R',
+    rings: ['0:1'],
+    arrows: 1,
+    symbol: 'R',
+    active: true,
+  });
   await expect.poll(() => dots(page)).not.toEqual(before);
   await idle(page);
   // Done: no highlight, the last symbol stays faintly, and the stickers sit
@@ -66,15 +92,19 @@ test('CIRCLE-02: a turn highlights its ring, shows the symbol and slides the dot
   expect([...after].sort()).toEqual([...before].sort());
 
   await page.keyboard.press('Shift+m');
-  await expect(graph(page)).toHaveAttribute('data-turning', 'M′');
-  expect(await activeRings(page)).toEqual(['0:0']);
+  expect(await midTurn(page)).toMatchObject({
+    turning: 'M′',
+    rings: ['0:0'],
+  });
   await idle(page);
   await page.keyboard.press('x');
-  await expect(graph(page)).toHaveAttribute('data-turning', 'x');
-  expect((await activeRings(page)).sort()).toEqual(['0:-1', '0:0', '0:1']);
+  expect(await midTurn(page)).toMatchObject({
+    turning: 'x',
+    rings: ['0:-1', '0:0', '0:1'],
+  });
   await idle(page);
   await page.keyboard.press('ArrowRight');
-  await expect(graph(page)).toHaveAttribute('data-turning', 'y');
+  expect(await midTurn(page)).toMatchObject({ turning: 'y' });
   await idle(page);
   await expect(graph(page).getByTestId('circle-move')).toHaveText('y');
   await expect(page.getByLabel('회전 이력')).toHaveText("RM'x→");

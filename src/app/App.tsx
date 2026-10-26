@@ -20,6 +20,9 @@ import { useCubeDrag } from '../features/simulator/useCubeDrag';
 import { LessonPanel } from '../features/f2l/LessonPanel';
 import { LastLayerPanel } from '../features/last-layer/LastLayerPanel';
 import { PracticePanel } from '../features/practice/PracticePanel';
+import { SolverPanel } from '../features/solver/SolverPanel';
+import type { PlaybackSpeed } from '../features/solver/playback';
+import { randomStart } from '../domain/solver/demo';
 import { PRACTICE_STAGES } from '../domain/practice/practice';
 import { targetIds, trainingStatus } from '../domain/f2l/lessons';
 import {
@@ -30,7 +33,7 @@ import {
 } from '../domain/last-layer/cases';
 import type { LastLayerCaseId } from '../domain/last-layer/cases';
 
-type Mode = 'practice' | 'f2l' | 'oll' | 'pll';
+type Mode = 'practice' | 'f2l' | 'oll' | 'pll' | 'solve';
 const modes: { id: Mode; title: string; note: string }[] = [
   {
     id: 'practice',
@@ -44,6 +47,7 @@ const modes: { id: Mode; title: string; note: string }[] = [
   },
   { id: 'oll', title: '2-Look OLL', note: '1·2층 다음, 윗면을 두 번에 노랗게' },
   { id: 'pll', title: '2-Look PLL', note: '윗면 노랑 다음, 위치를 두 번에' },
+  { id: 'solve', title: '풀이 데모', note: '섞인 큐브를 처음부터 끝까지' },
 ];
 const firstCase: Record<'oll' | 'pll', LastLayerCaseId> = {
   oll: 'oll-line',
@@ -78,7 +82,10 @@ export function App() {
   const [counterclockwise, setCounterclockwise] = useState(false);
   const [slow, setSlow] = useState(false);
   const [focus, setFocus] = useState(true);
+  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
   const command = session.queue[0];
+  const lesson = session.lesson;
+  const demo = lesson?.kind === 'solve';
   const drag = useCubeDrag({ busy: Boolean(command), slow, dispatch });
   // A queued command always wins; otherwise show the live drag preview.
   const shownMove = command?.move ?? drag.preview?.move;
@@ -95,7 +102,9 @@ export function App() {
     ).matches;
     // A released drag resumes from its angle and only animates the remainder.
     const from = command.from ?? 0;
-    const duration = (reduced ? 0 : slow ? 650 : 260) * (1 - from);
+    // The demo's playback speed scales every turn, manual turns included.
+    const scale = demo ? speed : 1;
+    const duration = ((reduced ? 0 : slow ? 650 : 260) / scale) * (1 - from);
     const tick = (time: number) => {
       start ??= time;
       const progress = duration
@@ -106,7 +115,7 @@ export function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [command, slow]);
+  }, [command, slow, demo, speed]);
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -161,13 +170,14 @@ export function App() {
       : hasWhiteCross(session.cube)
         ? '흰색 십자가 완성'
         : '자유롭게 연습 중';
-  const lesson = session.lesson;
   const mode: Mode =
     !lesson || lesson.kind === 'practice'
       ? 'practice'
       : lesson.kind === 'f2l'
         ? 'f2l'
-        : lastLayerSet(lesson.id);
+        : lesson.kind === 'solve'
+          ? 'solve'
+          : lastLayerSet(lesson.id);
   const activeMode = modes.find((item) => item.id === mode)!;
   const practice = lesson?.kind === 'practice' ? lesson.exercise : null;
   // Which F2L pair or last-layer step the current lesson or practice is on.
@@ -207,6 +217,8 @@ export function App() {
     if (next === mode) return;
     if (next === 'practice') dispatch({ type: 'preset', preset: 'solved' });
     else if (next === 'f2l') dispatch({ type: 'lesson', id: 1 });
+    else if (next === 'solve')
+      dispatch({ type: 'solve', exercise: randomStart() });
     else dispatch({ type: 'last-layer', id: firstCase[next] });
   };
   const facesLegend = (faces: Face[]) =>
@@ -307,7 +319,9 @@ export function App() {
                 ? `R·${f2lSide === 'left' ? 'B' : 'G'}·W 코너 · R·${f2lSide === 'left' ? 'B' : 'G'} 엣지 / 두 그림은 같은 큐브입니다.`
                 : lastLayerStep
                   ? `${lastLayerStep.startsWith('oll') ? '윗면의 노란 스티커' : '윗층 옆면의 색'}로 케이스를 찾아보세요 / 두 그림은 같은 큐브입니다.`
-                  : '연습할 단계를 고르세요 / 두 그림은 같은 큐브입니다.'}
+                  : demo
+                    ? '섞인 큐브가 맞춰지는 과정을 따라가 보세요 / 두 그림은 같은 큐브입니다.'
+                    : '연습할 단계를 고르세요 / 두 그림은 같은 큐브입니다.'}
             </div>
             <div className="yaw-controls">
               <button
@@ -395,6 +409,15 @@ export function App() {
                 session={session}
                 lesson={lesson?.kind === 'practice' ? lesson : null}
                 dispatch={dispatch}
+              />
+            )}
+            {lesson?.kind === 'solve' && (
+              <SolverPanel
+                session={session}
+                lesson={lesson}
+                dispatch={dispatch}
+                speed={speed}
+                onSpeedChange={setSpeed}
               />
             )}
             {lesson?.kind === 'last-layer' && (
@@ -514,7 +537,9 @@ export function App() {
                     ? `${mode.toUpperCase()} ${lastLayerCase.name} 케이스`
                     : practice
                       ? `단계별 연습 · ${PRACTICE_STAGES.find((stage) => stage.id === practice.stage)!.title} 랜덤 배치`
-                      : '맞춘 큐브'}
+                      : lesson?.kind === 'solve'
+                        ? `풀이 데모 · ${lesson.exercise.source}`
+                        : '맞춘 큐브'}
               </strong>
               에서 시작했습니다. 큐브 그림과 오른쪽 원 그래프는 언제나 같은
               큐브를 보여 줍니다. 원 그래프는 여섯 면의 스티커를 점으로 펼친
@@ -545,6 +570,18 @@ export function App() {
                 만듭니다. F2L은 배운 다섯 유형과 좌우 대칭 중에서 나옵니다.
                 풀이는 처음에 숨겨져 있고, 풀이 보기를 누르면 케이스 이름과 U
                 맞추기를 포함한 공식·시연이 나타납니다.
+              </p>
+            )}
+            {demo && (
+              <p>
+                풀이 데모는 섞은 큐브를 두 방법으로 맞춥니다. CFOP는 십자(흰
+                엣지 네 개를 최소 수로) → F2L(네 페어를 하나씩, 매번 가장 짧은
+                페어부터) → OLL 1·2 → PLL 1·2단계(2-Look 공식) 여섯 단계로
+                나뉘며, 단계를 누르면 그 단계 시작으로 바로 옮겨 갑니다. 거의
+                최적 해법은 두 단계 탐색(min2phase)이 정해진 탐색량 안에서 찾은
+                가장 짧은 해법으로, 보통 18~20수입니다. 진짜 최단 해법 계산은
+                휴대폰에 너무 무거워 쓰지 않습니다. 재생 속도는 0.5×~4×에서
+                고르며 멈춤으로 언제든 멈출 수 있습니다.
               </p>
             )}
             {lesson?.kind === 'f2l' && (

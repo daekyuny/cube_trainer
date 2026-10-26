@@ -21,6 +21,9 @@ export function SolutionSteps({
   busy,
   dispatch,
   doneLabel,
+  range,
+  breaks = [],
+  playLabel = '전체 시연',
   children,
 }: {
   exercise: GuidedExercise;
@@ -29,14 +32,22 @@ export function SolutionSteps({
   busy: boolean;
   dispatch: Dispatch<Action>;
   doneLabel: string;
+  // A demo stage: only its tokens, and play stops at its end.
+  range?: { start: number; end: number; tokenStart: number; tokenEnd: number };
+  // Token indices that start a new line (e.g. each F2L pair).
+  breaks?: number[];
+  playLabel?: string;
   children?: ReactNode;
 }) {
+  const first = range?.start ?? 0;
+  const tokens = exercise.tokens.slice(
+    range?.tokenStart ?? 0,
+    range?.tokenEnd ?? exercise.tokens.length,
+  );
   const reference = cursor === null ? null : exercise.checkpoints[cursor];
   const rotated = reference !== null && !isLessonView(cube, reference);
   const next =
-    cursor === null
-      ? undefined
-      : exercise.tokens.find((token) => token.end > cursor);
+    cursor === null ? undefined : tokens.find((token) => token.end > cursor);
   const nextScreenMove =
     next && cursor !== null && reference
       ? lessonMove(
@@ -52,7 +63,7 @@ export function SolutionSteps({
   const previous =
     cursor === null
       ? undefined
-      : [0, ...exercise.tokens.map((token) => token.end)]
+      : [first, ...tokens.map((token) => token.end)]
           .filter((end) => end < cursor)
           .at(-1);
   const seek = (to: number | undefined) => {
@@ -79,45 +90,55 @@ export function SolutionSteps({
       >
         <button
           className="solution-start"
-          aria-disabled={busy || cursor === null || cursor === 0}
-          aria-current={cursor === 0 ? 'step' : undefined}
-          onClick={() => seek(0)}
+          aria-disabled={busy || cursor === null || cursor === first}
+          aria-current={cursor === first ? 'step' : undefined}
+          onClick={() => seek(first)}
         >
           시작
         </button>
-        {segments(exercise.tokens).map(({ tokens, group }) => {
-          const buttons = tokens.map(({ token, index }) => (
-            <button
-              key={index}
-              aria-disabled={busy || cursor === null}
-              className={`solution-token${cursor !== null && cursor >= token.end ? ' visited' : ''}`}
-              aria-label={`${index + 1}수 ${token.label}까지 이동`}
-              aria-current={
-                cursor !== null && cursor > token.start && cursor <= token.end
-                  ? 'step'
-                  : undefined
-              }
-              data-partial={
-                cursor !== null && cursor > token.start && cursor < token.end
-              }
-              onClick={() => seek(token.end)}
-            >
-              {token.label}
-            </button>
-          ));
-          if (group === undefined) return buttons;
-          const name = triggerName(tokens.map(({ token }) => token));
-          return (
-            <span
-              key={`group-${group}`}
-              className="solution-group"
-              data-trigger={name}
-            >
-              <span className="solution-group-moves">{buttons}</span>
-              {name && <small aria-hidden="true">{name}</small>}
-            </span>
-          );
-        })}
+        {segments(exercise.tokens, range?.tokenStart ?? 0, tokens.length).map(
+          ({ tokens, group }) => {
+            const lineBreak = breaks.includes(tokens[0].index) && (
+              <span
+                key={`break-${tokens[0].index}`}
+                className="solution-break"
+                aria-hidden="true"
+              />
+            );
+            const buttons = tokens.map(({ token, index }) => (
+              <button
+                key={index}
+                aria-disabled={busy || cursor === null}
+                className={`solution-token${cursor !== null && cursor >= token.end ? ' visited' : ''}`}
+                aria-label={`${index + 1}수 ${token.label}까지 이동`}
+                aria-current={
+                  cursor !== null && cursor > token.start && cursor <= token.end
+                    ? 'step'
+                    : undefined
+                }
+                data-partial={
+                  cursor !== null && cursor > token.start && cursor < token.end
+                }
+                onClick={() => seek(token.end)}
+              >
+                {token.label}
+              </button>
+            ));
+            if (group === undefined) return [lineBreak, ...buttons];
+            const name = triggerName(tokens.map(({ token }) => token));
+            return [
+              lineBreak,
+              <span
+                key={`group-${group}`}
+                className="solution-group"
+                data-trigger={name}
+              >
+                <span className="solution-group-moves">{buttons}</span>
+                {name && <small aria-hidden="true">{name}</small>}
+              </span>,
+            ];
+          },
+        )}
       </div>
       <p className="notation-note solution-reference">
         수순·설명은 빨강 앞 · 초록 오른쪽 기준입니다.
@@ -151,9 +172,15 @@ export function SolutionSteps({
         <button
           className="secondary-button"
           disabled={busy || !next}
-          onClick={() => dispatch({ type: 'guide', wholeStage: true })}
+          onClick={() =>
+            dispatch(
+              range
+                ? { type: 'guide', to: range.end }
+                : { type: 'guide', wholeStage: true },
+            )
+          }
         >
-          전체 시연
+          {playLabel}
         </button>
       </div>
       {cursor === null && (
@@ -168,12 +195,14 @@ export function SolutionSteps({
 }
 
 // Consecutive tokens of one parenthesized group render inside one bracket.
-function segments(all: SolutionToken[]) {
+// `from` / `count` pick a stage's tokens; indices stay those of the whole.
+function segments(all: SolutionToken[], from = 0, count = all.length) {
   const result: {
     group?: number;
     tokens: { token: SolutionToken; index: number }[];
   }[] = [];
-  all.forEach((token, index) => {
+  all.slice(from, from + count).forEach((token, offset) => {
+    const index = from + offset;
     const last = result.at(-1);
     if (last && token.group !== undefined && last.group === token.group)
       last.tokens.push({ token, index });

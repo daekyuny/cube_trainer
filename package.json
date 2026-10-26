@@ -16,11 +16,13 @@
     "test:pages": "playwright test --config playwright.pages.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
+    "generate:f2l": "node scripts/generate-f2l-table.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run lint && npm run format:check"
   },
   "dependencies": {
+    "min2phase.js": "0.0.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

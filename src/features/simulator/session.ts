@@ -1,4 +1,9 @@
-import { applyMove, inverse, makePreset } from '../../domain/cube/cube.ts';
+import {
+  applyMove,
+  inverse,
+  isSolved,
+  makePreset,
+} from '../../domain/cube/cube.ts';
 import type { Cube, Move, Preset } from '../../domain/cube/cube.ts';
 import { getExercise, trainingStatus } from '../../domain/f2l/lessons.ts';
 import type { LessonId, LessonSide } from '../../domain/f2l/lessons.ts';
@@ -9,6 +14,7 @@ import {
 import type { LastLayerCaseId } from '../../domain/last-layer/cases.ts';
 import { isPracticeComplete } from '../../domain/practice/practice.ts';
 import type { PracticeExercise } from '../../domain/practice/practice.ts';
+import type { SolveExercise } from '../../domain/solver/demo.ts';
 import { guideCursor, lessonMove } from '../../domain/training/guide.ts';
 import type { GuidedExercise } from '../../domain/training/guide.ts';
 
@@ -40,10 +46,13 @@ export type Lesson =
     }
   | { kind: 'last-layer'; id: LastLayerCaseId; cursor: number | null }
   // A generated random start: the exercise itself is kept, not an id.
-  | { kind: 'practice'; exercise: PracticeExercise; cursor: number | null };
+  | { kind: 'practice'; exercise: PracticeExercise; cursor: number | null }
+  // A solution demo: a scrambled or photographed start and its solution.
+  | { kind: 'solve'; exercise: SolveExercise; cursor: number | null };
 export type F2LLesson = Extract<Lesson, { kind: 'f2l' }>;
 export type LastLayerLesson = Extract<Lesson, { kind: 'last-layer' }>;
 export type PracticeLesson = Extract<Lesson, { kind: 'practice' }>;
+export type SolveLesson = Extract<Lesson, { kind: 'solve' }>;
 export type Action =
   | { type: 'move'; move: Move; from?: number }
   | { type: 'frame'; progress: number; command: QueuedMove }
@@ -52,8 +61,14 @@ export type Action =
   | { type: 'last-layer'; id: LastLayerCaseId }
   // Generated outside the reducer so the reducer stays pure.
   | { type: 'practice'; exercise: PracticeExercise }
+  | { type: 'solve'; exercise: SolveExercise }
   | { type: 'seek'; cursor: number }
-  | { type: 'guide'; wholeStage?: boolean }
+  // `to`: play on up to that cursor (a demo stage's end).
+  | { type: 'guide'; wholeStage?: boolean; to?: number }
+  // Demo only: put the cube at a cursor's checkpoint at once.
+  | { type: 'jump'; cursor: number }
+  // Let the turn in progress finish and drop the rest of the queue.
+  | { type: 'pause' }
   | { type: 'clear-history' }
   | { type: 'restart' }
   | { type: 'undo' };
@@ -76,7 +91,7 @@ export function createSession(preset: Preset = 'solved'): Session {
 export function lessonExercise(lesson: Lesson): GuidedExercise {
   return lesson.kind === 'f2l'
     ? getExercise(lesson.id, lesson.variant, lesson.side)
-    : lesson.kind === 'practice'
+    : lesson.kind === 'practice' || lesson.kind === 'solve'
       ? lesson.exercise
       : getLastLayerExercise(lesson.id);
 }
@@ -84,6 +99,7 @@ export function lessonExercise(lesson: Lesson): GuidedExercise {
 export function isLessonComplete(lesson: Lesson, cube: Cube): boolean {
   if (lesson.kind === 'practice')
     return isPracticeComplete(lesson.exercise, cube);
+  if (lesson.kind === 'solve') return isSolved(cube);
   return lesson.kind === 'f2l'
     ? trainingStatus(cube, lesson.side) === 'paired'
     : lastLayerStatus(cube, getLastLayerExercise(lesson.id).case.step) ===
@@ -136,6 +152,35 @@ export function sessionReducer(state: Session, action: Action): Session {
       action.exercise.stage === 'f2l' ? 'cross' : 'f2l',
       { kind: 'practice', exercise: action.exercise, cursor: 0 },
     );
+  if (action.type === 'solve')
+    return startLesson(action.exercise, 'random', {
+      kind: 'solve',
+      exercise: action.exercise,
+      cursor: 0,
+    });
+  if (action.type === 'pause')
+    return state.queue.length > 1
+      ? { ...state, queue: state.queue.slice(0, 1) }
+      : state;
+  if (action.type === 'jump') {
+    if (state.queue.length || state.lesson?.kind !== 'solve') return state;
+    const { checkpoints } = state.lesson.exercise;
+    if (
+      !Number.isInteger(action.cursor) ||
+      action.cursor < 0 ||
+      action.cursor >= checkpoints.length
+    )
+      return state;
+    // A jump is not a turn: the history starts over from the new position.
+    return {
+      ...state,
+      cube: checkpoints[action.cursor],
+      history: [],
+      progress: 0,
+      message: '',
+      lesson: { ...state.lesson, cursor: action.cursor },
+    };
+  }
   if (action.type === 'clear-history') {
     return {
       ...state,
@@ -197,8 +242,13 @@ export function sessionReducer(state: Session, action: Action): Session {
       return state;
     const exercise = lessonExercise(state.lesson);
     const cursor = state.lesson.cursor;
-    // Every lesson guides a single stage: the whole printed algorithm.
-    const end = action.wholeStage ? exercise.solution.length : cursor + 1;
+    // Lessons guide a single stage: the whole printed algorithm. A demo
+    // plays one of its stages with `to`.
+    const end = Math.min(
+      exercise.solution.length,
+      action.to ?? (action.wholeStage ? exercise.solution.length : cursor + 1),
+    );
+    if (end <= cursor) return state;
     return {
       ...state,
       queue: exercise.solution.slice(cursor, end).map((move) => ({

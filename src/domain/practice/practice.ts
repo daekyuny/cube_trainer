@@ -173,7 +173,11 @@ function lastLayerPractice(
 }
 
 // U adjustments merge into the algorithm's own first / last U turn.
-function aroundTurns(before: string, algorithm: string, after: string) {
+export function aroundTurns(
+  before: string,
+  algorithm: string,
+  after: string,
+): string {
   const tokens = algorithm.split(' ');
   if (tokens[0] in QUARTERS) {
     before = turnBy(QUARTERS[before] + QUARTERS[tokens[0]]);
