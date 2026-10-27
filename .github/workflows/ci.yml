@@ -1,9 +1,13 @@
 name: CI and Pages
 
+# Documents are not part of the site: a push or PR that only changes them
+# skips the checks and deployment (manual runs always run).
 on:
   push:
     branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', 'tasks/**']
   pull_request:
+    paths-ignore: ['**/*.md', 'docs/**', 'tasks/**']
   workflow_dispatch:
 
 permissions:

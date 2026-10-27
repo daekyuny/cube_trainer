@@ -157,6 +157,6 @@ Y층에서의 인접 위치와 R/G 법선 일치로 페어를 판정한다. 십�
 
 Vite의 `pages` 모드는 자산 기본 경로를 `/cube_trainer/`로 설정한다. 일반 개발·빌드는 루트 경로를 유지한다. `playwright.pages.config.ts`는 별도 포트에서 실제 `dist/`를 미리보기 서버로 띄우고 같은 브라우저 테스트를 하위 경로에 적용한다. 테스트의 상대 탐색은 두 경로에서 동일하게 동작한다.
 
-CI의 `check` job은 일반·Pages 빌드를 각각 검증한다. 성공한 Pages 결과만 아티팩트로 올리고, `needs: check`인 `deploy` job이 GitHub Pages로 게시한다. PR은 읽기 권한으로 검증만 수행하고, Pages 및 OIDC 쓰기 권한은 main 배포 job에만 부여한다. 전체 main 워크플로를 직렬화하여 서로 다른 커밋의 빌드·배포가 겹치지 않게 한다.
+CI의 `check` job은 일반·Pages 빌드를 각각 검증한다. 문서(`*.md`, `docs/`, `tasks/`)는 배포 결과에 들어가지 않으므로 문서만 바뀐 push·PR은 `paths-ignore`로 워크플로를 건너뛴다. 수동 실행은 항상 전체를 실행한다. 성공한 Pages 결과만 아티팩트로 올리고, `needs: check`인 `deploy` job이 GitHub Pages로 게시한다. PR은 읽기 권한으로 검증만 수행하고, Pages 및 OIDC 쓰기 권한은 main 배포 job에만 부여한다. 전체 main 워크플로를 직렬화하여 서로 다른 커밋의 빌드·배포가 겹치지 않게 한다.
 
 배포용 토큰을 저장소에 추가하지 않으며 공식 Pages Actions의 `GITHUB_TOKEN`·OIDC를 사용한다. 서비스 주소·수용 기준은 SPEC, 초기 설정·수동 실행·복구 절차는 README에 기록한다.

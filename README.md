@@ -56,6 +56,7 @@ npm run dev
 `.github/workflows/ci.yml`의 **CI and Pages** 워크플로가 배포를 관리합니다.
 
 - `main` push: 타입·린트·포맷, 단위 테스트, 일반 빌드와 브라우저 테스트, Pages 빌드와 브라우저 테스트가 모두 성공하면 자동 배포합니다.
+- 문서만 바뀐 push·PR(`*.md`, `docs/`, `tasks/`)은 사이트에 영향이 없으므로 워크플로를 실행하지 않습니다. 문서는 로컬에서 `npx prettier --check`와 `git diff --check`로 확인합니다. 코드와 함께 바뀌면 평소처럼 전체를 검사합니다.
 - PR: 동일한 검증을 실행하며 배포하지 않습니다.
 - 수동 실행: GitHub Actions에서 **CI and Pages → Run workflow → main**을 선택합니다. 다른 브랜치에서 수동 실행하면 검증만 수행합니다.
 - 배포는 검증한 `dist/` 아티팩트를 그대로 사용합니다. 배포 job에만 Pages 쓰기 권한이 있으며 별도 배포 토큰을 저장할 필요가 없습니다.
