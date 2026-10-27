@@ -1,8 +1,13 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { projectPoint } from '../../src/features/simulator/gesture.ts';
-import { applyMoves, solvedCube } from '../../src/domain/cube/cube.ts';
+import {
+  applyMoves,
+  COLOR_NAMES,
+  solvedCube,
+} from '../../src/domain/cube/cube.ts';
 import type { Vec3 } from '../../src/domain/cube/cube.ts';
+import { cubeColors } from '../../src/domain/solver/facelets.ts';
 import { homeFacelet } from '../../src/domain/solver/pieces.ts';
 import { parseAlgorithm } from '../../src/domain/training/guide.ts';
 
@@ -168,6 +173,13 @@ test('PHOTO-01: two corner photos rebuild the same cube, and its solution solves
 test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', async ({
   page,
 }) => {
+  // The real colors, from the scramble shown in the demo.
+  const truth = cubeColors(
+    applyMoves(
+      solvedCube(),
+      parseAlgorithm((await page.getByTestId('scramble-moves').textContent())!),
+    ),
+  );
   const shown = await page.getByTestId('cube-front').innerHTML();
   const first = await takePhoto(page);
   for (const key of ['z', 'z', 'y']) await page.keyboard.press(key);
@@ -213,14 +225,6 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
     'data-unsure',
     'true',
   );
-  const names: Record<string, string> = {
-    '#e74453': '빨강',
-    '#26ad77': '초록',
-    '#f6d64b': '노랑',
-    '#f7f8f3': '흰색',
-    '#4284e5': '파랑',
-    '#fb9143': '주황',
-  };
   const paint = async (face: string, facelet: number, color: string) => {
     await page.locator(`.net-face[data-face="${face}"]`).click();
     await page.locator(`.net-editor-grid [data-facelet="${facelet}"]`).click();
@@ -233,26 +237,22 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
   await expect(
     page.locator(`.net-editor-grid [data-facelet="${repainted}"]`),
   ).toHaveAttribute('data-unclear', 'true');
-  await paint('D', repainted, names[original]);
-  // Had the reader given it the other color, a sticker of that color was
-  // pushed out to make room (shown in the original color, marked): put it
-  // back. Other marked stickers were read right and stay as they are.
-  const confirm = page.getByRole('button', { name: '이 색으로 풀이 보기' });
-  if (await confirm.isDisabled())
-    for (const face of await page
-      .locator('.net-face[data-unsure="true"]')
-      .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-face')!))) {
-      await page.locator(`.net-face[data-face="${face}"]`).click();
-      for (const button of await page
-        .locator('.net-editor-grid button[data-unclear="true"]')
-        .all()) {
-        const facelet = Number(await button.getAttribute('data-facelet'));
-        // The label reads "3번 칸 노랑": the color is the third word.
-        const shown = (await button.getAttribute('aria-label'))!.split(' ')[2];
-        if (facelet !== repainted && shown === names[original])
-          await paint(face, facelet, names[partner[original]]);
-      }
+  // Then do what the learner does: on every marked face, set each sticker
+  // that differs from the real cube to its real color.
+  for (const face of await page
+    .locator('.net-face[data-unsure="true"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-face')!))) {
+    await page.locator(`.net-face[data-face="${face}"]`).click();
+    for (const button of await page
+      .locator('.net-editor-grid button:not([disabled])')
+      .all()) {
+      const facelet = Number(await button.getAttribute('data-facelet'));
+      // The label reads "3번 칸 노랑": the color is the third word.
+      const shown = (await button.getAttribute('aria-label'))!.split(' ')[2];
+      const real = COLOR_NAMES[truth[facelet]];
+      if (shown !== real) await paint(face, facelet, real);
     }
+  }
   await page.getByRole('button', { name: '이 색으로 풀이 보기' }).click();
   await expect(status(page)).toHaveAttribute('data-status', 'ready', {
     timeout: 30000,
