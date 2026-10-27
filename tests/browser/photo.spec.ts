@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { projectPoint } from '../../src/features/simulator/gesture.ts';
+import { applyMoves, solvedCube } from '../../src/domain/cube/cube.ts';
 import type { Vec3 } from '../../src/domain/cube/cube.ts';
+import { homeFacelet } from '../../src/domain/solver/pieces.ts';
+import { parseAlgorithm } from '../../src/domain/training/guide.ts';
 
 // "Photos" are screenshots of the app's own cube drawing: the near corner
 // view (U/F/R as held), the second one after z2 y shows D/L/B.
@@ -68,6 +71,17 @@ async function upload(
     );
     await page.mouse.up();
   }
+}
+
+// The unfolded net's facelet (standard order) of the sticker seen at
+// `position`/`normal` when the cube is held turned by `held`.
+function netFacelet(held: string, position: Vec3, normal: Vec3): number {
+  const turned = applyMoves(solvedCube(), parseAlgorithm(held));
+  const same = (a: Vec3, b: Vec3) => a.every((v, i) => v === b[i]);
+  const sticker = turned.find(
+    (s) => same(s.position, position) && same(s.normal, normal),
+  )!;
+  return homeFacelet(sticker.id);
 }
 
 // From one color toward another in HSV (hue the short way round), as hex.
@@ -192,10 +206,9 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
   await page.getByRole('button', { name: '이 위치로 색 읽기' }).click();
 
   await expect(scan(page)).toHaveAttribute('data-step', 'review');
-  // The repainted sticker's face is marked first. If the reader gave it the
-  // other color, a sticker of that color was pushed out to make room and is
-  // marked too: the two then trade colors.
-  const unsure = page.locator('.net-face[data-unsure="true"]');
+  // The repainted sticker (held U face, front-right edge after z2 y) sits on
+  // this facelet of the unfolded net; its face is marked for confirmation.
+  const repainted = netFacelet('z2 y', [1, 1, 0], [0, 1, 0]);
   await expect(page.locator('.net-face[data-face="D"]')).toHaveAttribute(
     'data-unsure',
     'true',
@@ -208,31 +221,38 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
     '#4284e5': '파랑',
     '#fb9143': '주황',
   };
-  const marked: { face: string; index: number; color: string }[] = [];
-  for (const face of await unsure.evaluateAll((nodes) =>
-    nodes.map((n) => n.getAttribute('data-face')!),
-  )) {
+  const paint = async (face: string, facelet: number, color: string) => {
     await page.locator(`.net-face[data-face="${face}"]`).click();
-    for (const button of await page
-      .locator('.net-editor-grid button[data-unclear="true"]')
-      .all())
-      marked.push({
-        face,
-        index: Number(await button.getAttribute('data-facelet')),
-        color: (await button.getAttribute('aria-label'))!.split(' ')[1],
-      });
-  }
-  expect(marked.length === 1 || marked.length === 2).toBe(true);
-  const target = (k: number) =>
-    marked.length === 1 ? names[original] : marked[1 - k].color;
-  for (const [k, { face, index }] of marked.entries()) {
-    await page.locator(`.net-face[data-face="${face}"]`).click();
-    await page.locator(`.net-editor-grid [data-facelet="${index}"]`).click();
+    await page.locator(`.net-editor-grid [data-facelet="${facelet}"]`).click();
     await page
       .getByRole('group', { name: '칸 색 고르기' })
-      .getByRole('button', { name: target(k) })
+      .getByRole('button', { name: color })
       .click();
-  }
+  };
+  await page.locator('.net-face[data-face="D"]').click();
+  await expect(
+    page.locator(`.net-editor-grid [data-facelet="${repainted}"]`),
+  ).toHaveAttribute('data-unclear', 'true');
+  await paint('D', repainted, names[original]);
+  // Had the reader given it the other color, a sticker of that color was
+  // pushed out to make room (shown in the original color, marked): put it
+  // back. Other marked stickers were read right and stay as they are.
+  const confirm = page.getByRole('button', { name: '이 색으로 풀이 보기' });
+  if (await confirm.isDisabled())
+    for (const face of await page
+      .locator('.net-face[data-unsure="true"]')
+      .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-face')!))) {
+      await page.locator(`.net-face[data-face="${face}"]`).click();
+      for (const button of await page
+        .locator('.net-editor-grid button[data-unclear="true"]')
+        .all()) {
+        const facelet = Number(await button.getAttribute('data-facelet'));
+        // The label reads "3번 칸 노랑": the color is the third word.
+        const shown = (await button.getAttribute('aria-label'))!.split(' ')[2];
+        if (facelet !== repainted && shown === names[original])
+          await paint(face, facelet, names[partner[original]]);
+      }
+    }
   await page.getByRole('button', { name: '이 색으로 풀이 보기' }).click();
   await expect(status(page)).toHaveAttribute('data-status', 'ready', {
     timeout: 30000,
