@@ -175,3 +175,16 @@ for (const viewport of [
         await button.evaluate((node) => node.outerHTML.slice(0, 80)),
       ).toBeGreaterThanOrEqual(44);
   });
+
+test('SOLVE-07: the i next to the move counter explains moves against 수', async ({
+  page,
+}) => {
+  const info = page.getByRole('button', { name: 'moves와 수의 차이' });
+  await expect(info).toHaveAttribute('aria-expanded', 'false');
+  await info.click();
+  await expect(page.locator('#moves-help')).toContainText('180° 회전');
+  await expect(page.locator('#moves-help')).toContainText('1수');
+  expect((await info.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await info.click();
+  await expect(page.locator('#moves-help')).toHaveCount(0);
+});

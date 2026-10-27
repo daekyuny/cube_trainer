@@ -83,6 +83,7 @@ export function App() {
   const [slow, setSlow] = useState(false);
   const [focus, setFocus] = useState(true);
   const [speed, setSpeed] = useState<PlaybackSpeed>(1);
+  const [movesHelp, setMovesHelp] = useState(false);
   const command = session.queue[0];
   const lesson = session.lesson;
   const demo = lesson?.kind === 'solve';
@@ -274,11 +275,33 @@ export function App() {
               <span className="live-badge">
                 <i /> {stageStatus}
               </span>
-              <span className="move-count">
-                {session.history.filter((move) => !isCubeRotation(move)).length}{' '}
-                moves
+              <span className="move-count-group">
+                <span className="move-count">
+                  {
+                    session.history.filter((move) => !isCubeRotation(move))
+                      .length
+                  }{' '}
+                  moves
+                </span>
+                <button
+                  className="info-button"
+                  aria-label="moves와 수의 차이"
+                  aria-expanded={movesHelp}
+                  aria-controls="moves-help"
+                  onClick={() => setMovesHelp(!movesHelp)}
+                >
+                  <span aria-hidden="true">i</span>
+                </button>
               </span>
             </div>
+            {movesHelp && (
+              <p id="moves-help" className="moves-help">
+                moves는 지금까지 돌린 90° 회전 횟수입니다. 180° 회전(U2·M2 등)은
+                2로 셉니다. 풀이와 공식에 나오는 ‘n수’는 180° 회전도 1수로 세는
+                표준 표기라서, 같은 풀이라도 moves가 더 많게 나옵니다. 큐브 전체
+                회전(x·y·z)은 둘 다 세지 않습니다.
+              </p>
+            )}
             <div
               className="cube-stage"
               data-testid="cube-stage"

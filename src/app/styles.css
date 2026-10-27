@@ -165,6 +165,23 @@ h1 {
   background: #709d79;
   border-radius: 50%;
 }
+.move-count-group {
+  display: inline-flex;
+  align-items: center;
+}
+/* Keeps its 44px touch target without making the toolbar taller. */
+.stage-toolbar .info-button {
+  margin: -12px -8px -12px 0;
+}
+.moves-help {
+  margin: 6px 12px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f1f5ed;
+  color: #4f6248;
+  font-size: 11px;
+  line-height: 1.6;
+}
 .move-count {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
