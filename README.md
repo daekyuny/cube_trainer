@@ -98,6 +98,7 @@ tests/                  상태 엔진 및 브라우저 테스트
 - [제품 명세 SPEC](SPEC.md): 제품 목표·요구사항·지침·제약·테스트 수용 기준
 - [기술 구조](docs/ARCHITECTURE.md): 상태, 투영, 애니메이션 책임
 - [작업 순서](docs/ROADMAP.md): 완료 항목과 다음 논의
+- [‘거의 최적’ 해법 설명](docs/NEAR_OPTIMAL_SOLVER.md): 두 단계 탐색 알고리즘과 최단 탐색의 계산량 줄이기
 
 현재 필요한 환경 변수나 외부 서비스는 없습니다. 개발 구성 참고: [Vite](https://vite.dev/guide/), [Playwright](https://playwright.dev/docs/test-configuration), [Node TypeScript 실행](https://nodejs.org/api/typescript.html).
 
