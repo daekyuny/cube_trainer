@@ -1438,6 +1438,27 @@ li[data-state='done'] .stage-number {
   grid-template-columns: 1fr 1fr;
   gap: 4px;
 }
+.scan-inputs > :only-child {
+  grid-column: 1 / -1;
+}
+.scan-palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  font-size: 11px;
+  color: #587050;
+}
+.scan-palette span {
+  flex: 1 1 160px;
+}
+.lesson-panel .scan-notice {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #deeedc;
+  color: #285633;
+}
 .scan-inputs label {
   display: grid;
   place-items: center;

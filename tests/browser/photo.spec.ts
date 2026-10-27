@@ -47,7 +47,7 @@ async function upload(
   page: Page,
   photo: Awaited<ReturnType<typeof takePhoto>>,
 ) {
-  await scan(page).getByLabel('사진 업로드').setInputFiles({
+  await scan(page).getByLabel('사진 찍기').setInputFiles({
     name: 'cube.png',
     mimeType: 'image/png',
     buffer: photo.buffer,
@@ -68,6 +68,44 @@ async function upload(
     );
     await page.mouse.up();
   }
+}
+
+// From one color toward another in HSV (hue the short way round), as hex.
+function towards(from: string, to: string, t: number): string {
+  const rgb = (hex: string) =>
+    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const toHsv = ([r, g, b]: number[]) => {
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    const h = !d
+      ? 0
+      : max === r
+        ? ((g - b) / d + 6) % 6
+        : max === g
+          ? (b - r) / d + 2
+          : (r - g) / d + 4;
+    return [h * 60, max ? d / max : 0, max];
+  };
+  const [h1, s1, v1] = toHsv(rgb(from));
+  const [h2, s2, v2] = toHsv(rgb(to));
+  // A gray has no hue of its own: keep the other color's.
+  const start = s1 < 0.1 ? h2 : h1;
+  const end = s2 < 0.1 ? h1 : h2;
+  const turn = ((end - start + 540) % 360) - 180;
+  const h = (start + turn * t + 360) % 360;
+  const sat = s1 + (s2 - s1) * t;
+  const v = v1 + (v2 - v1) * t;
+  const f = (n: number) => {
+    const k = (n + h / 60) % 6;
+    return v - v * sat * Math.max(0, Math.min(k, 4 - k, 1));
+  };
+  return `#${[f(5), f(3), f(1)]
+    .map((c) =>
+      Math.round(c * 255)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 }
 
 test.describe.configure({ timeout: 90000 });
@@ -120,7 +158,8 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
   const first = await takePhoto(page);
   for (const key of ['z', 'z', 'y']) await page.keyboard.press(key);
   // Repaint one top edge sticker (D as held) halfway between its color and
-  // the one it is most easily mistaken for.
+  // the one it lies nearest to, as the reader sees colors (hue, saturation,
+  // brightness).
   const sticker = page
     .getByTestId('cube-front')
     .locator('g[data-position="1,1,0"][data-face="U"] polygon')
@@ -128,23 +167,13 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
   const original = (await sticker.getAttribute('fill'))!;
   const partner: Record<string, string> = {
     '#e74453': '#fb9143',
-    '#fb9143': '#e74453',
+    '#fb9143': '#f6d64b',
     '#f7f8f3': '#f6d64b',
-    '#f6d64b': '#f7f8f3',
+    '#f6d64b': '#fb9143',
     '#4284e5': '#26ad77',
     '#26ad77': '#4284e5',
   };
-  const mixed = `#${[1, 3, 5]
-    .map((i) =>
-      Math.round(
-        (parseInt(original.slice(i, i + 2), 16) +
-          parseInt(partner[original].slice(i, i + 2), 16)) /
-          2,
-      )
-        .toString(16)
-        .padStart(2, '0'),
-    )
-    .join('')}`;
+  const mixed = towards(original, partner[original], 0.5);
   await sticker.evaluate((node, fill) => {
     node.setAttribute('fill', fill);
     node.setAttribute('stroke', fill);
@@ -163,13 +192,14 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
   await page.getByRole('button', { name: '이 위치로 색 읽기' }).click();
 
   await expect(scan(page)).toHaveAttribute('data-step', 'review');
+  // The repainted sticker's face is marked first. If the reader gave it the
+  // other color, a sticker of that color was pushed out to make room and is
+  // marked too: the two then trade colors.
   const unsure = page.locator('.net-face[data-unsure="true"]');
-  await expect(unsure).toHaveCount(1);
-  await expect(unsure).toHaveAttribute('data-face', 'D');
-  // The unsure face is open; set its marked sticker to the real color.
-  const marked = page.locator('.net-editor-grid button[data-unclear="true"]');
-  await expect(marked).toHaveCount(1);
-  await marked.click();
+  await expect(page.locator('.net-face[data-face="D"]')).toHaveAttribute(
+    'data-unsure',
+    'true',
+  );
   const names: Record<string, string> = {
     '#e74453': '빨강',
     '#26ad77': '초록',
@@ -178,10 +208,31 @@ test('PHOTO-02: an unclear sticker opens the net on its face for confirmation', 
     '#4284e5': '파랑',
     '#fb9143': '주황',
   };
-  await page
-    .getByRole('group', { name: '칸 색 고르기' })
-    .getByRole('button', { name: names[original] })
-    .click();
+  const marked: { face: string; index: number; color: string }[] = [];
+  for (const face of await unsure.evaluateAll((nodes) =>
+    nodes.map((n) => n.getAttribute('data-face')!),
+  )) {
+    await page.locator(`.net-face[data-face="${face}"]`).click();
+    for (const button of await page
+      .locator('.net-editor-grid button[data-unclear="true"]')
+      .all())
+      marked.push({
+        face,
+        index: Number(await button.getAttribute('data-facelet')),
+        color: (await button.getAttribute('aria-label'))!.split(' ')[1],
+      });
+  }
+  expect(marked.length === 1 || marked.length === 2).toBe(true);
+  const target = (k: number) =>
+    marked.length === 1 ? names[original] : marked[1 - k].color;
+  for (const [k, { face, index }] of marked.entries()) {
+    await page.locator(`.net-face[data-face="${face}"]`).click();
+    await page.locator(`.net-editor-grid [data-facelet="${index}"]`).click();
+    await page
+      .getByRole('group', { name: '칸 색 고르기' })
+      .getByRole('button', { name: target(k) })
+      .click();
+  }
   await page.getByRole('button', { name: '이 색으로 풀이 보기' }).click();
   await expect(status(page)).toHaveAttribute('data-status', 'ready', {
     timeout: 30000,
@@ -205,4 +256,35 @@ test('PHOTO-03: the same corner twice is refused with a hint', async ({
   await expect(status(page)).toHaveAttribute('data-status', 'ready', {
     timeout: 30000,
   });
+});
+
+test('PHOTO-04: a solved cube calibrates the colors, kept in this browser until cleared', async ({
+  page,
+}) => {
+  // The demo always scrambles: photograph the solved cube of the first page.
+  await page.goto('./');
+  const first = await takePhoto(page);
+  for (const key of ['z', 'z', 'y']) await page.keyboard.press(key);
+  const second = await takePhoto(page);
+  await openDemo(page);
+  await page.getByRole('button', { name: '사진으로 입력' }).click();
+  const palette = page.getByTestId('scan-palette');
+  await expect(palette).toContainText('기본값');
+  await expect(scan(page).getByLabel('사진 업로드')).toHaveCount(0);
+  await palette.getByRole('button', { name: '맞춘 큐브로 색 보정' }).click();
+  await expect(scan(page)).toHaveAttribute('data-mode', 'calibrate');
+  await upload(page, first);
+  await page.getByRole('button', { name: '이 위치로 색 읽기' }).click();
+  await upload(page, second);
+  await page.getByRole('button', { name: '이 위치로 색 읽기' }).click();
+  await expect(scan(page)).toHaveAttribute('data-mode', 'scan');
+  await expect(scan(page).getByRole('status')).toContainText('색 보정을 저장');
+  await expect(palette).toContainText('내 큐브로 보정함');
+
+  await page.reload();
+  await openDemo(page);
+  await page.getByRole('button', { name: '사진으로 입력' }).click();
+  await expect(palette).toContainText('내 큐브로 보정함');
+  await palette.getByRole('button', { name: '보정 지우기' }).click();
+  await expect(palette).toContainText('기본값');
 });

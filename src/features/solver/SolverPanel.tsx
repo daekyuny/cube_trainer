@@ -17,6 +17,8 @@ import {
 } from '../../domain/solver/demo';
 import { parseAlgorithm } from '../../domain/training/guide';
 import { PhotoScan } from '../scan/PhotoScan';
+import { loadPalette, savePalette } from '../scan/palette';
+import type { Palette } from '../../domain/scan/colors';
 import type { SolveExercise, SolveMethod } from '../../domain/solver/demo';
 import type { Action, Session, SolveLesson } from '../simulator/session';
 import { SolutionSteps } from '../training/SolutionSteps';
@@ -74,6 +76,7 @@ export function SolverPanel({
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoRequest = useRef<number | null>(null);
+  const [palette, setPalette] = useState<Palette | null>(loadPalette);
 
   const request = useSolver((response) => {
     if (response.id === photoRequest.current) {
@@ -221,6 +224,11 @@ export function SolverPanel({
         <PhotoScan
           busy={photoBusy}
           error={photoError}
+          palette={palette}
+          onPalette={(next) => {
+            setPalette(next);
+            savePalette(next);
+          }}
           onColors={fromPhoto}
           onCancel={() => setScanning(false)}
         />

@@ -9,8 +9,14 @@ import {
 import type { Color, Face, Move } from '../cube/cube.ts';
 import { FACELET_FACES, FACELETS, faceletIndex } from '../solver/facelets.ts';
 import { homeFacelet } from '../solver/pieces.ts';
-import { classifyStickers, distance, REFERENCE, rgbToLab } from './colors.ts';
-import type { Lab, Rgb } from './colors.ts';
+import {
+  calibrate,
+  classifyStickers,
+  DEFAULT_PALETTE,
+  distance,
+  feature,
+} from './colors.ts';
+import type { Feature, Palette, Rgb } from './colors.ts';
 
 // The 24 ways to hold the cube, as whole-cube turns from the standard one.
 const ORIENTATIONS: Move[][] = (
@@ -73,33 +79,55 @@ export type ScanResult =
   | { ok: false; message: string };
 
 // A sticker is unclear when it sits nearly as close to another color.
-export const UNSURE_AMBIGUITY = 0.6;
-// Distinct sticker colors stay well apart even under different light.
-const SAME_CENTER = 15;
+export const UNSURE_AMBIGUITY = 0.75;
+// Distinct sticker colors stay well apart even under different light (red
+// and orange, the closest pair, are about 0.4 apart).
+const SAME_CENTER = 0.12;
 
-export function readCube(
+// The holds the instructions ask for: yellow up, red front, green right;
+// then white up, blue front, orange right (the opposite corner).
+const INSTRUCTED: Color[] = [
+  'yellow',
+  'red',
+  'green',
+  'white',
+  'blue',
+  'orange',
+];
+// How much worse than the best center naming the instructed holds may look
+// and still win: a logo on a center can make it read like another color.
+const INSTRUCTED_MARGIN = 0.5;
+
+// The 54 samples in standard facelet order, after working out from the
+// centers how each photo was held.
+function orient(
   photos: readonly [PhotoSamples, PhotoSamples],
-): ScanResult {
-  const labs = photos.map(
-    (photo) => new Map([...photo].map(([f, rgb]) => [f, rgbToLab(rgb)])),
+  palette: Palette,
+): { ok: true; samples: Feature[] } | { ok: false; message: string } {
+  const features = photos.map(
+    (photo) => new Map([...photo].map(([f, rgb]) => [f, feature(rgb)])),
   );
   // Name the six centers together: each photo must be a way of holding the
   // cube, and the two must show opposite corners (all six faces).
   const seen = photos.flatMap((_, p) =>
-    HELD.map((face) => labs[p].get(CENTER(face))!),
+    HELD.map((face) => features[p].get(CENTER(face))!),
   );
-  // Six faces need six clearly different centers; a near repeat means the
-  // same face was photographed twice.
-  const repeat = seen.some((a, i) =>
-    seen.some((b, j) => j > i && distance(a, b) < SAME_CENTER),
-  );
-  if (repeat)
+  // The same corner photographed twice repeats its centers. One look-alike
+  // pair is not enough: a logo can make the white center read like blue.
+  const repeated = seen
+    .slice(0, 3)
+    .filter((a) =>
+      seen.slice(3).some((b) => distance(a, b) < SAME_CENTER),
+    ).length;
+  if (repeated >= 2)
     return {
       ok: false,
       message:
         '두 사진에 같은 면이 찍힌 것 같습니다. 두 번째는 반대쪽 꼭짓점을 찍어 주세요.',
     };
-  let best: { cost: number; maps: Map<number, number>[] } | null = null;
+  type Naming = { cost: number; maps: Map<number, number>[] };
+  let best: Naming | null = null;
+  let instructed: Naming | null = null;
   for (const colors of permutations(Object.values(FACE_COLORS))) {
     const maps = [
       heldMapping(colors.slice(0, 3)),
@@ -110,35 +138,89 @@ export function readCube(
       HELD.map((face) => FACELETS[map.get(CENTER(face))!].face),
     );
     if (new Set(faces).size !== 6) continue;
-    const cost = colors.reduce(
-      (sum, color, i) => sum + distance(seen[i], REFERENCE[color]),
-      0,
-    );
-    if (!best || cost < best.cost)
-      best = { cost, maps: maps as Map<number, number>[] };
+    const naming = {
+      cost: colors.reduce(
+        (sum, color, i) => sum + distance(seen[i], palette[color]),
+        0,
+      ),
+      maps: maps as Map<number, number>[],
+    };
+    if (!best || naming.cost < best.cost) best = naming;
+    if (colors.join() === INSTRUCTED.join()) instructed = naming;
   }
-  if (!best)
+  const chosen =
+    instructed && best && instructed.cost <= best.cost + INSTRUCTED_MARGIN
+      ? instructed
+      : best;
+  if (!chosen)
     return {
       ok: false,
       message: '두 사진의 센터 색으로 큐브 방향을 알 수 없습니다.',
     };
-  const samples: Lab[] = [];
+  const samples: Feature[] = [];
   photos.forEach((_, p) => {
-    for (const [held, lab] of labs[p]) samples[best!.maps[p].get(held)!] = lab;
+    for (const [held, value] of features[p])
+      samples[chosen.maps[p].get(held)!] = value;
   });
   if (samples.filter(Boolean).length !== 54)
     return {
       ok: false,
       message: '두 사진이 서로 반대쪽 세 면을 보여야 합니다.',
     };
-  const centers = new Map(
-    FACES.map((face) => [CENTER(face), FACE_COLORS[face]] as const),
+  return { ok: true, samples };
+}
+
+const CENTERS = new Map(
+  FACES.map((face) => [CENTER(face), FACE_COLORS[face]] as const),
+);
+
+export function readCube(
+  photos: readonly [PhotoSamples, PhotoSamples],
+  palette: Palette = DEFAULT_PALETTE,
+): ScanResult {
+  const oriented = orient(photos, palette);
+  if (!oriented.ok) return oriented;
+  const { colors, ambiguity } = classifyStickers(
+    oriented.samples,
+    CENTERS,
+    palette,
   );
-  const { colors, ambiguity } = classifyStickers(samples, centers);
   return review(
     colors,
     ambiguity.map((value) => value > UNSURE_AMBIGUITY),
   );
+}
+
+// Calibration: the same two photos of a solved cube give every sticker's
+// true color, so each color's reading under this light becomes the palette.
+// Refused when the faces do not look solved (most stickers of each face
+// must be nearest to the face's own color).
+export function calibrateFromSolved(
+  photos: readonly [PhotoSamples, PhotoSamples],
+): { ok: true; palette: Palette } | { ok: false; message: string } {
+  const oriented = orient(photos, DEFAULT_PALETTE);
+  if (!oriented.ok) return oriented;
+  const groups = new Map<Color, Feature[]>();
+  oriented.samples.forEach((value, index) => {
+    if (CENTERS.has(index)) return;
+    const color = FACE_COLORS[FACELETS[index].face];
+    groups.set(color, [...(groups.get(color) ?? []), value]);
+  });
+  const palette = calibrate(groups);
+  for (const [color, values] of groups) {
+    const own = values.filter((value) =>
+      (Object.keys(palette) as Color[]).every(
+        (other) =>
+          distance(value, palette[color]) <= distance(value, palette[other]),
+      ),
+    ).length;
+    if (own < 6)
+      return {
+        ok: false,
+        message: `${COLOR_NAMES[color]} 면이 고르게 읽히지 않습니다. 맞춘 큐브를 밝은 곳에서 다시 찍어 주세요.`,
+      };
+  }
+  return { ok: true, palette };
 }
 
 // Faces to show for confirmation: unclear stickers and broken cube rules.

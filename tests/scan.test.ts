@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   applyMoves,
@@ -9,6 +10,7 @@ import {
   solvedCube,
 } from '../src/domain/cube/cube.ts';
 import type { Color, Cube } from '../src/domain/cube/cube.ts';
+import { distance } from '../src/domain/scan/colors.ts';
 import type { Rgb } from '../src/domain/scan/colors.ts';
 import {
   defaultHexagon,
@@ -16,7 +18,11 @@ import {
   homography,
   samplePoints,
 } from '../src/domain/scan/geometry.ts';
-import { checkCube, readCube } from '../src/domain/scan/scan.ts';
+import {
+  calibrateFromSolved,
+  checkCube,
+  readCube,
+} from '../src/domain/scan/scan.ts';
 import type { PhotoSamples } from '../src/domain/scan/scan.ts';
 import { cubeColors, FACELETS } from '../src/domain/solver/facelets.ts';
 import { parseAlgorithm } from '../src/domain/training/guide.ts';
@@ -206,4 +212,118 @@ test('SCAN-05: sample points sit inside the fitted faces, a perspective map keep
   assert.ok(Math.abs(center.point[1] - (cy + ty) / 2) < 1);
   assert.ok(points.every((p) => p.radius > 5 && p.radius < 40));
   assert.equal(gridLines(hexagon).length, 24);
+});
+
+// Real readings of a stickerless GAN cube in daylight (see the fixture note).
+const REAL = JSON.parse(
+  readFileSync(
+    new URL('./fixtures/real-cube-colors.json', import.meta.url),
+    'utf8',
+  ),
+) as {
+  faces: Record<Color, Rgb[]>;
+  corners: { yellowUp: [number, Rgb][]; whiteUp: [number, Rgb][] };
+};
+const realCorners = (): [PhotoSamples, PhotoSamples] => [
+  new Map(REAL.corners.yellowUp),
+  new Map(REAL.corners.whiteUp),
+];
+
+test('SCAN-06: real corner photos of a solved cube read back exactly, logo on the white center included', () => {
+  const [first, second] = realCorners();
+  // The white center reads blue (its logo); orientation still holds.
+  const result = readCube([first, second]);
+  assert.ok(result.ok);
+  if (!result.ok) return;
+  assert.deepEqual(result.colors, cubeColors(solvedCube()));
+});
+
+// A scrambled cube as those two photos would show it: every sticker takes a
+// real reading of its color (centers their own, logo too) dimmed by how lit
+// its face was in the real corner photos, then varied per sticker.
+const FACE_LIGHT: Record<string, number> = {
+  '0U': 0.905,
+  '0F': 1,
+  '0R': 0.54,
+  '1U': 0.88,
+  '1F': 0.96,
+  '1R': 0.77,
+};
+function realPhoto(
+  cube: Cube,
+  held: string,
+  index: 0 | 1,
+  spread: number,
+  noise: number,
+  random: () => number,
+): PhotoSamples {
+  const colors = cubeColorsHeld(applyMoves(cube, parseAlgorithm(held)));
+  const samples = new Map<number, Rgb>();
+  colors.forEach((color, facelet) => {
+    const face = FACELETS[facelet].face;
+    if (!['U', 'R', 'F'].includes(face)) return;
+    const cells = REAL.faces[color];
+    const base =
+      facelet % 9 === 4
+        ? cells[4]
+        : cells.filter((_, i) => i !== 4)[Math.floor(random() * 8)];
+    const k =
+      FACE_LIGHT[`${index}${face}`] * (1 - spread / 2 + spread * random());
+    samples.set(
+      facelet,
+      base.map((v) =>
+        Math.max(0, Math.min(255, v * k + (random() - 0.5) * noise)),
+      ) as unknown as Rgb,
+    );
+  });
+  return samples;
+}
+
+test('SCAN-07: scrambled cubes in real colors and face light read correctly; misreads are never silent', () => {
+  const random = seeded(77);
+  let wrong = 0;
+  for (let i = 0; i < 60; i++) {
+    const { cube } = makePreset('random', random);
+    const result = readCube([
+      realPhoto(cube, '', 0, 0.4, 30, random),
+      realPhoto(cube, 'z2 y', 1, 0.4, 30, random),
+    ]);
+    assert.ok(result.ok);
+    if (!result.ok) continue;
+    wrong += result.colors.filter((c, k) => c !== cubeColors(cube)[k]).length;
+  }
+  assert.equal(wrong, 0);
+  // Much harsher light: a few stickers may be misread, but each such cube
+  // asks for confirmation or breaks a cube rule.
+  for (let i = 0; i < 60; i++) {
+    const { cube } = makePreset('random', random);
+    const result = readCube([
+      realPhoto(cube, '', 0, 0.7, 45, random),
+      realPhoto(cube, 'z2 y', 1, 0.7, 45, random),
+    ]);
+    if (!result.ok) continue;
+    const misread = result.colors.some((c, k) => c !== cubeColors(cube)[k]);
+    if (misread)
+      assert.ok(result.unsureFacelets.length || result.problems.length);
+  }
+});
+
+test('SCAN-08: a solved cube calibrates the palette; a scrambled one is refused', () => {
+  const calibration = calibrateFromSolved(realCorners());
+  assert.ok(calibration.ok);
+  if (!calibration.ok) return;
+  // Calibrated red and orange sit where this cube shows them, still apart.
+  assert.ok(
+    distance(calibration.palette.red, calibration.palette.orange) > 0.25,
+  );
+  const random = seeded(5);
+  const { cube } = makePreset('random', random);
+  const shots: [PhotoSamples, PhotoSamples] = [
+    realPhoto(cube, '', 0, 0.3, 20, random),
+    realPhoto(cube, 'z2 y', 1, 0.3, 20, random),
+  ];
+  const result = readCube(shots, calibration.palette);
+  assert.ok(result.ok);
+  if (result.ok) assert.deepEqual(result.colors, cubeColors(cube));
+  assert.equal(calibrateFromSolved(shots).ok, false);
 });

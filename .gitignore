@@ -11,3 +11,6 @@ test-results/
 .DS_Store
 .agents/
 .codex/
+
+# Real cube photos for tuning color reading (personal, has GPS data)
+photos/

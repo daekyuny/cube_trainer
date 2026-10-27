@@ -1,40 +1,43 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { Color } from '../../domain/cube/cube';
-import { review, readCube } from '../../domain/scan/scan';
+import type { Palette } from '../../domain/scan/colors';
+import { calibrateFromSolved, readCube, review } from '../../domain/scan/scan';
 import type { PhotoSamples, ScanResult } from '../../domain/scan/scan';
 import { ColorNet } from './ColorNet';
 import { PhotoFit } from './PhotoFit';
 import { loadPhoto, readPhoto } from './photo';
 import type { Photo } from './photo';
 
-const SHOTS = [
-  {
-    title: '사진 1/2',
-    text: '노랑이 위, 빨강이 왼쪽 앞(크게 보이는 면), 초록이 오른쪽에 오도록 들고 가까운 꼭짓점을 정면에서 찍습니다.',
-  },
-  {
-    title: '사진 2/2',
-    text: '큐브를 위아래로 뒤집어 흰색을 위로 하고, 반대쪽 꼭짓점(파랑·주황)이 보이게 찍습니다.',
-  },
+const HOLDS = [
+  '노랑이 위, 빨강이 왼쪽 앞(크게 보이는 면), 초록이 오른쪽에 오도록 들고 가까운 꼭짓점을 정면에서 찍습니다.',
+  '큐브를 위아래로 뒤집어 흰색을 위로 하고, 파랑이 왼쪽 앞, 주황이 오른쪽에 오는 반대쪽 꼭짓점을 찍습니다.',
 ];
 
+type Mode = 'scan' | 'calibrate';
 type Reviewing = Extract<ScanResult, { ok: true }>;
 
-// Two corner photos (taken now or picked from the album) → fit the outline
-// → read the colors. Only when a reading is unclear or impossible does the
-// unfolded net ask the learner to confirm those faces.
+// Two corner photos taken with the camera → fit the outline → read the
+// colors. Only when a reading is unclear or impossible does the unfolded net
+// ask the learner to confirm those faces. Calibration takes the same two
+// photos of a solved cube and keeps how this cube's colors look here.
 export function PhotoScan({
   busy,
   error,
+  palette,
+  onPalette,
   onColors,
   onCancel,
 }: {
   busy: boolean;
   error: string | null;
+  palette: Palette | null;
+  onPalette: (palette: Palette | null) => void;
   onColors: (colors: Color[]) => void;
   onCancel: () => void;
 }) {
+  const [mode, setMode] = useState<Mode>('scan');
+  const [notice, setNotice] = useState('');
   const [step, setStep] = useState(0);
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [first, setFirst] = useState<PhotoSamples | null>(null);
@@ -60,16 +63,36 @@ export function PhotoScan({
       setMessage('사진을 열 수 없습니다. 다른 사진을 골라 주세요.');
     }
   };
+  const restart = (next: Mode) => {
+    setMode(next);
+    setStep(0);
+    setFirst(null);
+    setPhoto(null);
+    setMessage('');
+    setNotice('');
+  };
   const read = () => {
     if (!photo) return;
     const samples = readPhoto(photo);
     if (step === 0) {
       setFirst(samples);
+      setNotice('');
       setPhoto(null);
       setStep(1);
       return;
     }
-    const scan = readCube([first!, samples]);
+    if (mode === 'calibrate') {
+      const calibration = calibrateFromSolved([first!, samples]);
+      if (!calibration.ok) {
+        setMessage(calibration.message);
+        return;
+      }
+      onPalette(calibration.palette);
+      restart('scan');
+      setNotice('색 보정을 저장했습니다. 이제 섞인 큐브를 찍으세요.');
+      return;
+    }
+    const scan = readCube([first!, samples], palette ?? undefined);
     if (!scan.ok) {
       setMessage(scan.message);
       return;
@@ -125,12 +148,62 @@ export function PhotoScan({
       </div>
     );
 
-  const shot = SHOTS[step];
+  const calibrating = mode === 'calibrate';
   return (
-    <div className="photo-scan" data-testid="photo-scan" data-step={step + 1}>
+    <div
+      className="photo-scan"
+      data-testid="photo-scan"
+      data-step={step + 1}
+      data-mode={mode}
+    >
       <p className="scan-instruction">
-        <strong>{shot.title}</strong> {shot.text}
+        <strong>
+          {calibrating ? '색 보정' : '사진'} {step + 1}/2
+        </strong>{' '}
+        {calibrating && '맞춘 큐브로 찍습니다. '}
+        {HOLDS[step]}
       </p>
+      {!photo && step === 0 && (
+        <div className="scan-palette" data-testid="scan-palette">
+          {calibrating ? (
+            <>
+              <span>
+                맞춘 큐브의 두 꼭짓점을 찍으면 이 큐브·이 조명의 색을 기억해
+                다음부터 더 정확히 읽습니다.
+              </span>
+              <button className="text-button" onClick={() => restart('scan')}>
+                보정 그만두기
+              </button>
+            </>
+          ) : (
+            <>
+              <span>색 기준: {palette ? '내 큐브로 보정함' : '기본값'}</span>
+              <button
+                className="text-button"
+                onClick={() => restart('calibrate')}
+              >
+                맞춘 큐브로 색 보정
+              </button>
+              {palette && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    onPalette(null);
+                    setNotice('색 보정을 지웠습니다.');
+                  }}
+                >
+                  보정 지우기
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {notice && (
+        <p className="scan-notice" role="status">
+          {notice}
+        </p>
+      )}
       {photo ? (
         <>
           <PhotoFit
@@ -151,15 +224,6 @@ export function PhotoScan({
               type="file"
               accept="image/*"
               capture="environment"
-              onChange={choose}
-            />
-          </label>
-          <label className="secondary-button">
-            사진 업로드
-            <input
-              className="visually-hidden"
-              type="file"
-              accept="image/*"
               onChange={choose}
             />
           </label>

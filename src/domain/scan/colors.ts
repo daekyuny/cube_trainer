@@ -1,7 +1,10 @@
 import type { Color } from '../cube/cube.ts';
 
 export type Rgb = readonly [number, number, number];
-export type Lab = readonly [number, number, number];
+// A sticker color as its chroma vector (saturation × hue direction) and its
+// brightness. Shade and exposure change brightness but keep hue, so red and
+// orange stay apart on a shaded face; white sits near the middle.
+export type Feature = readonly [number, number, number];
 
 export const SCAN_COLORS: Color[] = [
   'white',
@@ -12,34 +15,48 @@ export const SCAN_COLORS: Color[] = [
   'green',
 ];
 
-// sRGB (0–255) to CIELAB (D65).
-export function rgbToLab([r, g, b]: Rgb): Lab {
-  const linear = (value: number) => {
-    const c = value / 255;
-    return c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92;
-  };
-  const [lr, lg, lb] = [linear(r), linear(g), linear(b)];
-  const x = (lr * 0.4124 + lg * 0.3576 + lb * 0.1805) / 0.95047;
-  const y = lr * 0.2126 + lg * 0.7152 + lb * 0.0722;
-  const z = (lr * 0.0193 + lg * 0.1192 + lb * 0.9505) / 1.08883;
-  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+export function hsv([r, g, b]: Rgb): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let hue = 0;
+  if (delta)
+    hue =
+      max === r
+        ? ((g - b) / delta + 6) % 6
+        : max === g
+          ? (b - r) / delta + 2
+          : (r - g) / delta + 4;
+  return [hue * 60, max ? delta / max : 0, max / 255];
 }
 
-// Lighting mostly changes lightness, so it counts for half; hue and chroma
-// tell red from orange and white from yellow.
-export function distance(a: Lab, b: Lab): number {
-  return Math.hypot((a[0] - b[0]) * 0.5, a[1] - b[1], a[2] - b[2]);
+export function feature(rgb: Rgb): Feature {
+  const [hue, saturation, value] = hsv(rgb);
+  const angle = (hue * Math.PI) / 180;
+  return [saturation * Math.cos(angle), saturation * Math.sin(angle), value];
 }
 
-// Typical sticker colors under daylight, only to name the six centers.
-export const REFERENCE: Record<Color, Lab> = {
-  white: rgbToLab([236, 238, 236]),
-  yellow: rgbToLab([240, 214, 40]),
-  red: rgbToLab([196, 26, 42]),
-  orange: rgbToLab([250, 122, 24]),
-  blue: rgbToLab([24, 84, 206]),
-  green: rgbToLab([22, 168, 82]),
+// Brightness counts a little: it only separates a dim, washed-out color
+// from white a bit better.
+export function distance(a: Feature, b: Feature): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], (a[2] - b[2]) * 0.25);
+}
+
+export type Palette = Record<Color, Feature>;
+const tone = (hue: number, saturation = 1, value = 0.9): Feature => {
+  const angle = (hue * Math.PI) / 180;
+  return [saturation * Math.cos(angle), saturation * Math.sin(angle), value];
+};
+// Measured from a stickerless cube in daylight (iPhone, straight-on faces):
+// red 349–354°, orange 16–19°, yellow 62°, green 120°, blue 206°, white
+// saturation ≤ 0.03. A calibration with the learner's own cube replaces it.
+export const DEFAULT_PALETTE: Palette = {
+  white: [0, 0, 0.88],
+  yellow: tone(62),
+  red: tone(352),
+  orange: tone(17),
+  blue: tone(206),
+  green: tone(120),
 };
 
 export type Classified = {
@@ -49,14 +66,17 @@ export type Classified = {
   ambiguity: number[];
 };
 
-// Nine stickers per color: start from the six centers' own colors, then
-// alternate a capacity-limited assignment with updating each color's mean.
+// Nine stickers per color: start from the palette, then alternate a
+// capacity-limited assignment with updating each color's mean from its
+// stickers, so the means settle on this cube under this light. Centers are
+// known and fixed; they never seed a mean (a center may carry a logo).
 export function classifyStickers(
-  samples: readonly Lab[],
+  samples: readonly Feature[],
   centers: ReadonlyMap<number, Color>,
+  palette: Palette = DEFAULT_PALETTE,
 ): Classified {
-  const means = new Map<Color, Lab>(
-    [...centers].map(([index, color]) => [color, samples[index]]),
+  const means = new Map<Color, Feature>(
+    SCAN_COLORS.map((color) => [color, palette[color]]),
   );
   let colors: Color[] = [];
   for (let round = 0; round < 8; round++) {
@@ -64,21 +84,27 @@ export function classifyStickers(
     const stable = next.every((color, index) => color === colors[index]);
     colors = next;
     for (const color of SCAN_COLORS) {
-      const members = samples.filter((_, index) => colors[index] === color);
-      means.set(
-        color,
-        [0, 1, 2].map(
-          (k) => members.reduce((sum, lab) => sum + lab[k], 0) / members.length,
-        ) as unknown as Lab,
+      const members = samples.filter(
+        (_, index) => colors[index] === color && !centers.has(index),
       );
+      if (members.length)
+        means.set(
+          color,
+          [0, 1, 2].map(
+            (k) =>
+              members.reduce((sum, value) => sum + value[k], 0) /
+              members.length,
+          ) as unknown as Feature,
+        );
     }
     if (stable) break;
   }
-  const ambiguity = samples.map((lab, index) => {
-    const own = distance(lab, means.get(colors[index])!);
+  const ambiguity = samples.map((value, index) => {
+    if (centers.has(index)) return 0;
+    const own = distance(value, means.get(colors[index])!);
     const other = Math.min(
       ...SCAN_COLORS.filter((color) => color !== colors[index]).map((color) =>
-        distance(lab, means.get(color)!),
+        distance(value, means.get(color)!),
       ),
     );
     return own / Math.max(other, 1e-6);
@@ -89,8 +115,8 @@ export function classifyStickers(
 // Cheapest pairs first while each color has room, then swap pairs of
 // stickers whenever that lowers the total distance.
 function assign(
-  samples: readonly Lab[],
-  means: ReadonlyMap<Color, Lab>,
+  samples: readonly Feature[],
+  means: ReadonlyMap<Color, Feature>,
   fixed: ReadonlyMap<number, Color>,
 ): Color[] {
   const cost = (index: number, color: Color) =>
@@ -98,7 +124,7 @@ function assign(
       ? fixed.get(index) === color
         ? -1e9
         : 1e9
-      : distance(samples[index], means.get(color)!);
+      : distance(samples[index], means.get(color)!) ** 2;
   const pairs = samples
     .flatMap((_, index) => SCAN_COLORS.map((color) => ({ index, color })))
     .sort((a, b) => cost(a.index, a.color) - cost(b.index, b.color));
@@ -123,4 +149,25 @@ function assign(
       }
   }
   return colors;
+}
+
+// A palette from a solved cube's samples: each color's mean, leaving out
+// the centers (a logo) and the readings farthest from the rest.
+export function calibrate(
+  samples: ReadonlyMap<Color, readonly Feature[]>,
+): Palette {
+  const palette = { ...DEFAULT_PALETTE };
+  for (const [color, values] of samples) {
+    if (!values.length) continue;
+    const middle = (list: readonly Feature[]) =>
+      [0, 1, 2].map(
+        (k) => list.reduce((sum, v) => sum + v[k], 0) / list.length,
+      ) as unknown as Feature;
+    const first = middle(values);
+    const kept = [...values]
+      .sort((a, b) => distance(a, first) - distance(b, first))
+      .slice(0, Math.max(1, Math.ceil(values.length * 0.75)));
+    palette[color] = middle(kept);
+  }
+  return palette;
 }
