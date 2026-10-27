@@ -271,6 +271,17 @@ test('PHOTO-04: a solved cube calibrates the colors, kept in this browser until 
   const palette = page.getByTestId('scan-palette');
   await expect(palette).toContainText('기본값');
   await expect(scan(page).getByLabel('사진 업로드')).toHaveCount(0);
+  // The info button opens and closes the explanation.
+  const info = palette.getByRole('button', { name: '색 보정 설명' });
+  await expect(info).toHaveAttribute('aria-expanded', 'false');
+  await info.click();
+  await expect(page.locator('#calibration-help')).toContainText(
+    '브라우저에만 저장',
+  );
+  await info.click();
+  await expect(page.locator('#calibration-help')).toHaveCount(0);
+  for (const button of await palette.getByRole('button').all())
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await palette.getByRole('button', { name: '맞춘 큐브로 색 보정' }).click();
   await expect(scan(page)).toHaveAttribute('data-mode', 'calibrate');
   await upload(page, first);

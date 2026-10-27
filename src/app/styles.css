@@ -1449,8 +1449,72 @@ li[data-state='done'] .stage-number {
   font-size: 11px;
   color: #587050;
 }
-.scan-palette span {
-  flex: 1 1 160px;
+.palette-state {
+  flex: 1 1 120px;
+}
+.palette-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 4px;
+}
+/* Small-looking buttons that keep a 44px touch target around the pill. */
+.chip-button,
+.info-button {
+  display: inline-grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.chip-button span {
+  padding: 4px 10px;
+  border: 1px solid #86a57c;
+  border-radius: 999px;
+  background: #eef4ea;
+  color: #2f5d45;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.chip-button:hover span,
+.chip-button:focus-visible span {
+  background: #35694f;
+  border-color: #35694f;
+  color: #fff;
+}
+.info-button {
+  min-width: 36px;
+}
+.info-button span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #86a57c;
+  border-radius: 50%;
+  color: #2f5d45;
+  font:
+    italic 700 13px Georgia,
+    serif;
+}
+.info-button[aria-expanded='true'] span {
+  background: #35694f;
+  border-color: #35694f;
+  color: #fff;
+}
+.chip-button:focus-visible,
+.info-button:focus-visible {
+  outline-offset: -2px;
+}
+.lesson-panel .palette-help {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f1f5ed;
+  color: #4f6248;
 }
 .lesson-panel .scan-notice {
   margin: 0;

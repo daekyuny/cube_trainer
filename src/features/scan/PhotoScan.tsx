@@ -38,6 +38,7 @@ export function PhotoScan({
 }) {
   const [mode, setMode] = useState<Mode>('scan');
   const [notice, setNotice] = useState('');
+  const [help, setHelp] = useState(false);
   const [step, setStep] = useState(0);
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [first, setFirst] = useState<PhotoSamples | null>(null);
@@ -165,37 +166,54 @@ export function PhotoScan({
       </p>
       {!photo && step === 0 && (
         <div className="scan-palette" data-testid="scan-palette">
-          {calibrating ? (
-            <>
-              <span>
-                맞춘 큐브의 두 꼭짓점을 찍으면 이 큐브·이 조명의 색을 기억해
-                다음부터 더 정확히 읽습니다.
-              </span>
-              <button className="text-button" onClick={() => restart('scan')}>
-                보정 그만두기
+          <span className="palette-state">
+            {calibrating
+              ? '맞춘 큐브로 찍어 주세요.'
+              : `색 기준: ${palette ? '내 큐브로 보정함' : '기본값'}`}
+          </span>
+          <div className="palette-actions">
+            {calibrating ? (
+              <button className="chip-button" onClick={() => restart('scan')}>
+                <span>보정 그만두기</span>
               </button>
-            </>
-          ) : (
-            <>
-              <span>색 기준: {palette ? '내 큐브로 보정함' : '기본값'}</span>
+            ) : (
               <button
-                className="text-button"
+                className="chip-button"
                 onClick={() => restart('calibrate')}
               >
-                맞춘 큐브로 색 보정
+                <span>맞춘 큐브로 색 보정</span>
               </button>
-              {palette && (
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    onPalette(null);
-                    setNotice('색 보정을 지웠습니다.');
-                  }}
-                >
-                  보정 지우기
-                </button>
-              )}
-            </>
+            )}
+            <button
+              className="info-button"
+              aria-label="색 보정 설명"
+              aria-expanded={help}
+              aria-controls="calibration-help"
+              onClick={() => setHelp(!help)}
+            >
+              <span aria-hidden="true">i</span>
+            </button>
+            {!calibrating && palette && (
+              <button
+                className="chip-button"
+                onClick={() => {
+                  onPalette(null);
+                  setNotice('색 보정을 지웠습니다.');
+                }}
+              >
+                <span>보정 지우기</span>
+              </button>
+            )}
+          </div>
+          {help && (
+            <p id="calibration-help" className="palette-help">
+              색 보정은 내 큐브가 지금 조명에서 어떤 색으로 찍히는지 앱에 알려
+              주는 단계입니다. 맞춘 큐브를 안내대로 두 번(노랑 위 꼭짓점, 흰색
+              위 반대쪽 꼭짓점) 찍으면 여섯 색의 기준을 새로 잡아, 섞인 큐브의
+              색을 더 정확히 읽습니다. 큐브나 조명(자연광·실내 조명)이 바뀌어
+              색이 자주 틀리면 다시 보정하세요. 보정값은 이 기기의 브라우저에만
+              저장되며 ‘보정 지우기’로 기본값에 돌아갑니다.
+            </p>
           )}
         </div>
       )}

@@ -95,7 +95,8 @@ test('SOLVE-03: a stage row jumps to its start and plays only that stage', async
   await expect(target).toHaveAttribute('data-state', 'done', {
     timeout: 30000,
   });
-  await expect(status(page)).toHaveAttribute('data-status', 'ready', {
+  // Finishing PLL 1 may already solve the cube (PLL 2 skipped).
+  await expect(status(page)).toHaveAttribute('data-status', /ready|complete/, {
     timeout: 30000,
   });
 });
